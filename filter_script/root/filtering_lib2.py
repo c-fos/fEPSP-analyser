@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 '''
 Created on 05.12.2011
-
+master 
 @author: pilat
 '''
 #library for filtering
