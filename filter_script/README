@@ -1,0 +1,6 @@
+This is a first alpha version of fEPSP-analyser.
+This script calculating fEPSP amplitude and saving it in mysql database.
+Also there is small script which create 3d reconstruction of experiment.
+
+I will add license, manual, documentation and screenshots as soon as i can.
+
