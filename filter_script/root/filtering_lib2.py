@@ -56,6 +56,12 @@ class dataSample:
             self.filtering()
         except:
             print("filtering() complete with error")
+            
+        try:
+            self.spikeFinding()
+        except:
+            print("spikeFinding() complete with error")    
+        """        
         try:
             self.responsesFind()
         except:
@@ -64,6 +70,7 @@ class dataSample:
             self.spikesIntoResponses()
         except:
             print("spikesIntoResponses() complete with error")
+       
         try:
             self.plotData()
         except:
@@ -72,6 +79,7 @@ class dataSample:
             self.writeData()
         except:
             print("writeData() complete with error")
+        """
         
     #0-reading command line arguments
 
@@ -162,7 +170,7 @@ class dataSample:
                 return data.std()        
 
 
-    def findStarts(self,data):
+    def findStimuli(self,data):
         pwr=pywt.swt(data, 'db2', 2, start_level=0)
         pwr2=abs(array(pwr[0][1]))
         treshold=int(max(pwr2)/2)
@@ -180,7 +188,7 @@ class dataSample:
 
 
     def cutStimuli(self,data):
-        self.findStarts(data)
+        self.findStimuli(data)
         if len(self.stimuli)!=0:
             tmpData=zeros(len(data))
             for i in range(len(data)):
@@ -194,7 +202,9 @@ class dataSample:
                 for j in range(self.stimulyDuration):
                     if start+j< len(tmpData)-1:
                         tmpData[start+j]=averege
-        return tmpData
+            return tmpData
+        else:
+            return data
 
 
     def mainLevelFinding(self):
@@ -218,7 +228,10 @@ class dataSample:
                 cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**4))
             self.coeffs[i]=cA, cD
         self.result=iswt(self.coeffs,self.wavelet)
+   
+    
 
+    """
     
     def responsesFind(self):
         self.responsesList=[]
@@ -261,11 +274,14 @@ class dataSample:
             print("len(self.responsesList)",len(self.responsesList))
         for i in range(len(self.responsesList)):
             self.extremums(i,self.responsesList[i][0]+self.localDelay,self.responsesList[i][1])
+    """
 
-
-    def extremums(self,responsNumber,start,stop):
-        minimum,minimumValue = extrema(self.result[start:stop],_max = False, _min = True, strict = False, withend = True)
-        maximum,maximumValue = extrema(self.result[start:stop],_max = True, _min = False, strict = False, withend = True)
+    def spikeFinding(self):
+        resultData=self.result
+        start=self.defaultFrame
+        stop=-self.defaultFrame
+        minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
+        maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         SD=self.stdFinder(self.cleanData,self.defaultFrame)*2*(self.coeffTreshold-5*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
         #extremum filtering
         spikePoints=[]
@@ -283,18 +299,14 @@ class dataSample:
             if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
-            ampl=self.result[spikePoints[i][0]]-self.result[spikePoints[i][1]]+(self.result[spikePoints[i][2]]-self.result[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0])
+            ampl=resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0])
             width=spikePoints[i][2]-spikePoints[i][0]            
             if width>self.stimulyDuration and ampl>SD and spikePoints[i][2]-start>self.localDelay:
                 index=len(self.spikeDict)
-                self.spikeDict[index]="r"+str(responsNumber)+"n"+str(i)
+                self.spikeDict[index]="n"+str(i)
                 setattr(self.spikeList,self.spikeDict[index],Spike(self.frequency))
                 tmpObject=getattr(self.spikeList,self.spikeDict[index])
-                tmpObject.responsNumber=responsNumber
-                tmpObject.responseStart=start
-                tmpObject.responseEnd=stop
                 tmpObject.spikeNumber=i
-                tmpObject.allSpikes=len(spikePoints)
                 tmpObject.spikeMax1=spikePoints[i][0]
                 tmpObject.spikeMin=spikePoints[i][1]
                 tmpObject.spikeMax2=spikePoints[i][2]
