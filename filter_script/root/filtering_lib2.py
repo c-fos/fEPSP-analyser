@@ -7,14 +7,14 @@ Created on 05.12.2011
 '''
 #library for filtering
 from mimetypes import guess_type
-from numpy import math, zeros, arange, loadtxt, fromfile, array, int16#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
+from numpy import math, zeros, arange, loadtxt, fromfile, array, int16, unique#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
 #from externalFunctions import iswt, smooth, extrema
 #import sys
 import matplotlib.pyplot as plt
 from externalFunctions import *
 from dbAccess import *
 from objects import *
-
+from hcluster import fclusterdata
 class dataSample:
     def __init__(self,filename,dbobject,spikeListObject,arguments):        
         #variables
@@ -60,8 +60,12 @@ class dataSample:
         try:
             self.spikeFinding()
         except:
-            print("spikeFinding() complete with error")    
-        """        
+            print("spikeFinding() complete with error")
+        try:
+            self.clusters=self.clusterization()
+        except:
+            print("clusterization() complete with error")  
+        """
         try:
             self.responsesFind()
         except:
@@ -70,11 +74,13 @@ class dataSample:
             self.spikesIntoResponses()
         except:
             print("spikesIntoResponses() complete with error")
-       
+
+        """
         try:
             self.plotData()
         except:
             print("plotData() complete with error") 
+        """
         try:
             self.writeData()
         except:
@@ -313,7 +319,36 @@ class dataSample:
                 tmpObject.spikeAmpl=ampl
                 tmpObject.calculate()
         print((self.fileName,self.spikeDict))
-
+     
+        
+    def clusterization(self):
+        if len(self.spikeDict)>1:
+            dictValues=array(self.spikeDict.values())
+            listOfSpikes=[]
+            spikesInClusters=[]
+            for i in dictValues:
+                tmpObject=getattr(self.spikeList,i)
+                listOfSpikes.append([tmpObject.spikeMin])
+            ndarrayOfSpikes=array(listOfSpikes)
+            try:
+                clusteredSpikes=fclusterdata(ndarrayOfSpikes,0.99,method='average')
+            except:
+                print("fclusterdata error")
+            clusterNumbers=unique(clusteredSpikes)
+            for i in clusterNumbers:
+                spikeIndexes=[clusteredSpikes==i]
+                spikesInClusters.append(list(dictValues[spikeIndexes]))
+            if self.debug==1:
+                print(spikesInClusters)
+            return(spikesInClusters)
+    
+    
+  #  def clusterAnalyser(self):
+        
+    
+    
+            
+        
 
     def plotData(self):
         fig = plt.figure()
@@ -324,7 +359,8 @@ class dataSample:
         ax.grid(color='k', linestyle='-', linewidth=0.4)
         for i in range(len(self.spikeDict)):
             tmpObject=getattr(self.spikeList,self.spikeDict[i])
-            tex = str((tmpObject.responsNumber,tmpObject.spikeNumber,tmpObject.spikeAmpl))
+            #tex = str((tmpObject.responsNumber,tmpObject.spikeNumber,tmpObject.spikeAmpl))
+            tex = str((tmpObject.spikeNumber,tmpObject.spikeAmpl))
             ax.plot(tmpObject.spikeMin,self.result[tmpObject.spikeMin],'or')
             ax.plot(tmpObject.spikeMax1,self.result[tmpObject.spikeMax1],'og')
             ax.plot(tmpObject.spikeMax2,self.result[tmpObject.spikeMax2],'og')
@@ -332,9 +368,9 @@ class dataSample:
             ax.text(tmpObject.spikeMin,self.result[tmpObject.spikeMin]-15, tex, fontsize=12, va='bottom')
         for i in range(len(self.stimuli)):
             ax.axvline(x=self.stimuli[i],color='g')
-        plt.savefig(self.fileName+"_graph.png")
-        #plt.show()
-        plt.close()# very important to stop memory leak
+        #plt.savefig(self.fileName+"_graph.png")
+        plt.show()
+        #plt.close()# very important to stop memory leak
         del fig
         
     def writeData(self):
