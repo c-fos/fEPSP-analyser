@@ -7,7 +7,7 @@ Created on 05.12.2011
 '''
 #library for filtering
 from mimetypes import guess_type
-from numpy import math, zeros, arange, loadtxt, fromfile, array, int16, unique#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
+from numpy import math, zeros, arange, loadtxt, fromfile, array, int16, unique, where#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
 #from externalFunctions import iswt, smooth, extrema
 #import sys
 import matplotlib.pyplot as plt
@@ -64,7 +64,12 @@ class dataSample:
         try:
             self.clusters=self.clusterization()
         except:
-            print("clusterization() complete with error")  
+            print("clusterization() complete with error") 
+        try:
+            self.clusterAnalyser()
+        except:
+            print("clusterAnalyser() complete with error")   
+            
         """
         try:
             self.responsesFind()
@@ -305,7 +310,7 @@ class dataSample:
             if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
-            ampl=resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0])
+            ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
             width=spikePoints[i][2]-spikePoints[i][0]            
             if width>self.stimulyDuration and ampl>SD and spikePoints[i][2]-start>self.localDelay:
                 index=len(self.spikeDict)
@@ -325,7 +330,6 @@ class dataSample:
         if len(self.spikeDict)>1:
             dictValues=array(self.spikeDict.values())
             listOfSpikes=[]
-            spikesInClusters=[]
             for i in dictValues:
                 tmpObject=getattr(self.spikeList,i)
                 listOfSpikes.append([tmpObject.spikeMin])
@@ -334,21 +338,38 @@ class dataSample:
                 clusteredSpikes=fclusterdata(ndarrayOfSpikes,0.99,method='average')
             except:
                 print("fclusterdata error")
+            rightClasterOrder=zeros(clusteredSpikes.size,dtype=int)
             clusterNumbers=unique(clusteredSpikes)
             for i in clusterNumbers:
-                spikeIndexes=[clusteredSpikes==i]
-                spikesInClusters.append(list(dictValues[spikeIndexes]))
+                k=where(rightClasterOrder==0)[0][0]
+                mask=clusteredSpikes==clusteredSpikes[k]
+                rightClasterOrder+=mask*i
+            #this cycle will be merged with priveous                               
+            #for i in clusterNumbers:
+            #    spikeIndexes=[rightClasterOrder==i]
+            #    spikesInClusters.append(list(dictValues[spikeIndexes]))
             if self.debug==1:
-                print(spikesInClusters)
-            return(spikesInClusters)
-    
-    
-  #  def clusterAnalyser(self):
-        
-    
-    
-            
-        
+                print((clusteredSpikes,rightClasterOrder))
+            return(rightClasterOrder)
+        else:
+            return(array([1]))
+
+
+    def clusterAnalyser(self):
+        dictValues=array(self.spikeDict.values())
+        clusters=self.clusters
+        print((clusters,dictValues))
+        for i in range(len(dictValues)):
+            print(i)
+            try:
+                tmpObject=getattr(self.spikeList,dictValues[i])
+                tmpObject.responsNumber=int(clusters[i])
+                k=where(clusters==int(clusters[i]))[0][0]
+                tmpObject.spikeNumber=int(i)-k
+                print((i,clusters[i],tmpObject.responsNumber,tmpObject.spikeNumber))
+            except:
+                pass
+       
 
     def plotData(self):
         fig = plt.figure()
@@ -359,8 +380,7 @@ class dataSample:
         ax.grid(color='k', linestyle='-', linewidth=0.4)
         for i in range(len(self.spikeDict)):
             tmpObject=getattr(self.spikeList,self.spikeDict[i])
-            #tex = str((tmpObject.responsNumber,tmpObject.spikeNumber,tmpObject.spikeAmpl))
-            tex = str((tmpObject.spikeNumber,tmpObject.spikeAmpl))
+            tex = str((tmpObject.responsNumber,tmpObject.spikeNumber,tmpObject.spikeAmpl))
             ax.plot(tmpObject.spikeMin,self.result[tmpObject.spikeMin],'or')
             ax.plot(tmpObject.spikeMax1,self.result[tmpObject.spikeMax1],'og')
             ax.plot(tmpObject.spikeMax2,self.result[tmpObject.spikeMax2],'og')
