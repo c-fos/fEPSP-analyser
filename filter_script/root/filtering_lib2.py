@@ -10,6 +10,10 @@ from mimetypes import guess_type
 from numpy import math, zeros, arange, loadtxt, fromfile, array, int16#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
 #from externalFunctions import iswt, smooth, extrema
 #import sys
+from matplotlib.transforms import Bbox
+from matplotlib.path import Path
+from matplotlib.patches import Rectangle
+
 import matplotlib.pyplot as plt
 from externalFunctions import *
 from dbAccess import *
@@ -266,7 +270,8 @@ class dataSample:
     def extremums(self,responsNumber,start,stop):
         minimum,minimumValue = extrema(self.result[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(self.result[start:stop],_max = True, _min = False, strict = False, withend = True)
-        SD=self.stdFinder(self.cleanData,self.defaultFrame)*2*(self.coeffTreshold-5*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
+        std,baseLevel=self.stdFinder(self.cleanData,self.defaultFrame,True)
+        SD=std*2*(self.coeffTreshold-5*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
         #extremum filtering
         spikePoints=[]
         if minimum[0]<maximum[0]:
@@ -284,7 +289,9 @@ class dataSample:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
             ampl=self.result[spikePoints[i][0]]-self.result[spikePoints[i][1]]+(self.result[spikePoints[i][2]]-self.result[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0])
-            width=spikePoints[i][2]-spikePoints[i][0]            
+            width=spikePoints[i][2]-spikePoints[i][0]
+            response_top=max(self.result[start:stop])
+            response_bottom=min(self.result[start:stop])     
             if width>self.stimulyDuration and ampl>SD and spikePoints[i][2]-start>self.localDelay:
                 index=len(self.spikeDict)
                 self.spikeDict[index]="r"+str(responsNumber)+"n"+str(i)
@@ -296,8 +303,15 @@ class dataSample:
                 tmpObject.spikeNumber=i
                 tmpObject.allSpikes=len(spikePoints)
                 tmpObject.spikeMax1=spikePoints[i][0]
+                tmpObject.spikeMax1Val=self.result[spikePoints[i][0]]
                 tmpObject.spikeMin=spikePoints[i][1]
+                tmpObject.spikeMinVal=self.result[spikePoints[i][1]]
                 tmpObject.spikeMax2=spikePoints[i][2]
+                tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
+                tmpObject.vpsp=response_top-baseLevel
+                tmpObject.response_top=response_top
+                tmpObject.response_bottom=response_bottom
+                tmpObject.baselevel=baseLevel
                 tmpObject.spikeAmpl=ampl
                 tmpObject.calculate()
         print((self.fileName,self.spikeDict))
@@ -309,7 +323,10 @@ class dataSample:
         ax.plot(self.cleanData,'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
+       # ax.plot(self.spikeLevel,'r')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
+        
+        
         for i in range(len(self.spikeDict)):
             tmpObject=getattr(self.spikeList,self.spikeDict[i])
             tex = str((tmpObject.responsNumber,tmpObject.spikeNumber,tmpObject.spikeAmpl))
@@ -318,6 +335,10 @@ class dataSample:
             ax.plot(tmpObject.spikeMax2,self.result[tmpObject.spikeMax2],'og')
             ax.vlines(tmpObject.spikeMin,self.result[tmpObject.spikeMin], self.result[tmpObject.spikeMin]+tmpObject.spikeAmpl, color='k', linestyles='dashed')
             ax.text(tmpObject.spikeMin,self.result[tmpObject.spikeMin]-15, tex, fontsize=12, va='bottom')
+            rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.1)
+            ax.add_patch(rect)   
+            ax.axhline(y=tmpObject.baselevel,color='g')
+            ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
         for i in range(len(self.stimuli)):
             ax.axvline(x=self.stimuli[i],color='g')
         plt.savefig(self.fileName+"_graph.png")
