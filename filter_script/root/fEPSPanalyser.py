@@ -61,18 +61,16 @@ class fepspAnalyser:
                 mysql_writer.time= strftime('%H%M%S',localtime(stat(fileList[i]).st_mtime))
                 if int(arguments[7]):
                     mysql_writer.dbWriteRecord()
-                spikeList=SpikeList()
-                dataSample1=dataSample(str(fileList[i]),mysql_writer,spikeList,arguments)
+                dataSample1=dataSample(str(fileList[i]),mysql_writer,arguments)
                 try:
                     name="./"+dirName+"/"+str(mysql_writer.time)+".pic"
                     with open(name,"w") as fd:
                         pickle.dump(dataSample1.result[dataSample1.stimuli[0]:],fd)
                 except: 
                     print("pickle with error")
-                del spikeList,dataSample1
+                del dataSample1
             except:
                 try:
-                    del spikeList
                     del dataSample1
                 except:
                     pass

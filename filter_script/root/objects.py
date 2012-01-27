@@ -5,9 +5,6 @@ Created on 05.12.2011
 
 @author: pilat
 '''
-class SpikeList:
-    def __init__(self):
-        pass
 
 class Spike:
     def __init__(self,frequency):
@@ -29,3 +26,8 @@ class Spike:
     def calculate(self):
         self.spikeLength=1000.0*(self.spikeMax2-self.spikeMax1)/self.frequency#msec
         self.spikeFrequency=(1.0/self.spikeLength)*1000
+
+
+class Response:
+    def __init__(self):
+        pass
