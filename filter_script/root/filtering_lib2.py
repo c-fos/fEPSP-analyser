@@ -193,9 +193,14 @@ class dataSample:
 
     def findStimuli(self,data):
         pwr=pywt.swt(data, 'db2', 2, start_level=0)
-        pwr2=abs(array(pwr[0][1]))
-        treshold=int(max(pwr2)/2)
-        pwr3=pywt.thresholding.greater(pwr2, treshold)
+        self.pwr2=abs(array(pwr[0][1]))
+        treshold=pwr[0][1].std()*10
+        pwr5=pywt.thresholding.greater(self.pwr2, treshold)
+        self.dpwr=diff(pwr5)>=treshold*3
+        print(("dpwr",where(self.dpwr==True)))
+        treshold=int(max(self.pwr2)/2)
+        pwr3=pywt.thresholding.greater(self.pwr2, treshold)
+        self.stimulMask=self.pwr2>=treshold
         pwr4=smooth(pwr3,self.stimulyDuration)
         if self.debug==1:
             print((type(extrema),max(pwr4)))
@@ -211,6 +216,7 @@ class dataSample:
     def cutStimuli(self,data):
         self.findStimuli(data)
         if len(self.stimuli)!=0:
+            """
             smallFrame=int(self.defaultFrame/50)
             print((self.stimuli,smallFrame))
             data=array(data)
@@ -242,7 +248,11 @@ class dataSample:
                 while(abs(data[k]-baselevel)>std1/4):
                     k+=1
                 stop=k
-                data[start:stop]=baselevel
+                """
+            mask=self.stimulMask
+            patchValues=data[:-100]*mask[100:]
+            data=data*(-mask)
+            #data[100:]+=patchValues
             return data
         else:
             return data
@@ -350,7 +360,7 @@ class dataSample:
                 tmpObject.responsNumber=int(clusters[i])
                 k=where(clusters==int(clusters[i]))[0][0]
                 tmpObject.spikeNumber=int(i)-k
-                print((i,clusters[i],tmpObject.responsNumber,tmpObject.spikeNumber))
+                #print((i,clusters[i],tmpObject.responsNumber,tmpObject.spikeNumber))
             except:
                 pass
             
@@ -358,39 +368,39 @@ class dataSample:
         responsMatrix=zeros((len(unique(self.clusters)),2))#[[start1,stop1],[start2,stop2]]
         length=len(self.result)
         smallFrame=self.defaultFrame/4
-        print((responsMatrix,length))
+        #print((responsMatrix,length))
         for i in unique(self.clusters):
             firstSpike=self.spikeDict.values()[list(self.clusters).index(i)]
             try:
                 lastSpike=self.spikeDict.values()[list(self.clusters).index(i+1)-1]
             except:
                 lastSpike=self.spikeDict.values()[-1]
-            print("*")
+            #print("*")
             tmpObject=getattr(self,firstSpike)
             firstMax=tmpObject.spikeMax1
             k=firstMax
             baseLevel=self.result[k-self.defaultFrame:k].mean()
             std2=self.result[k-self.defaultFrame:k].std()
-            print((baseLevel,std2))
+            #print((baseLevel,std2))
             while(abs(self.result[k-smallFrame:k].mean()-baseLevel)>std2/2 or self.result[k-smallFrame:k].std()>std2/2):
-                print("start")
+                #print("start")
                 k-=smallFrame/2
             start=k
             tmpObject=getattr(self,lastSpike)
             lastMax=tmpObject.spikeMax2
             k=lastMax
-            print(("#",baseLevel,std2))
+            #print(("#",baseLevel,std2))
             while((abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*4].std()>std2/2) and k<length):
                 k+=smallFrame
-                print("stop")
+                #print("stop")
             stop=k
-            print((start,firstMax,lastMax,stop))
+            #print((start,firstMax,lastMax,stop))
             responsMatrix[i-1]=start,stop
         return responsMatrix
     
     def responsAnalysis(self):
         rMatrix=self.responsMatrix
-        print((len(unique(self.clusters)),self.clusters))
+        #print((len(unique(self.clusters)),self.clusters))
         for i in unique(self.clusters):
             index=len(self.responseDict)
             self.responseDict[index]="r"+str(i)
@@ -404,14 +414,14 @@ class dataSample:
             tmpObject.responsNumber=i
             tmpObject.vpsp=tmpObject.response_top-tmpObject.baselevel
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
-            print(tmpObject.spikes)
+            #print(tmpObject.spikes)
         print(self.responseDict)
         
 
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(self.cleanData,'r')
+        ax.plot(self.data[self.dpwr],'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
         #ax.plot(self.spikeLevel,'r')
