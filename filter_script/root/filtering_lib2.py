@@ -112,6 +112,7 @@ class dataSample:
         self.coeffTreshold = int(self.arguments[4])
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
+        self.isClusterOn = int(self.arguments[8])
                       
     #1-data Loading
 
@@ -192,67 +193,30 @@ class dataSample:
 
 
     def findStimuli(self,data):
-        pwr=pywt.swt(data, 'db2', 2, start_level=0)
-        self.pwr2=abs(array(pwr[0][1]))
-        treshold=pwr[0][1].std()*10
-        pwr5=pywt.thresholding.greater(self.pwr2, treshold)
-        self.dpwr=diff(pwr5)>=treshold*3
-        print(("dpwr",where(self.dpwr==True)))
-        treshold=int(max(self.pwr2)/2)
-        pwr3=pywt.thresholding.greater(self.pwr2, treshold)
-        self.stimulMask=self.pwr2>=treshold
-        pwr4=smooth(pwr3,self.stimulyDuration)
-        if self.debug==1:
-            print((type(extrema),max(pwr4)))
-        self.stimuli=extrema(pwr4,_min=False)[0]
-        for i in range(len(self.stimuli)):
-            if self.stimuli[i] > self.defaultFrame and self.stimuli[i] < len(data) - self.defaultFrame:
-                self.stimuli[i]=self.stimuli[i]-self.stimulyDuration/4
-            else:
-                pass
-        self.stimuli=self.stimuli[self.stimuli.__gt__(self.defaultFrame)*self.stimuli.__lt__(len(data)-self.defaultFrame)]
-
+        pwr=pywt.swt(data, 'db2', 3)
+        self.pwr2=array(pwr[2][1])
+        treshold=abs(max(self.pwr2))/4
+        self.pwr2[self.pwr2<treshold]=0
+        self.pwr5=smooth(self.pwr2,10)
+        self.pwr5[self.pwr5>0]=treshold 
+        self.dpwr=where((diff(self.pwr5)>treshold/2)==True)[0]
+        self.dpwrM=where((diff(self.pwr5)<-treshold/2)==True)[0]
+        stimList=[[],[]]
+        for i in range(len(self.dpwr)):
+            start=self.dpwr[i]
+            length=(self.dpwrM[i]-self.dpwr[i])*3
+            stop=start+length
+            stimList[0]+=[start]
+            stimList[1]+=[stop]
+        self.stimuli=stimList
 
     def cutStimuli(self,data):
         self.findStimuli(data)
-        if len(self.stimuli)!=0:
-            """
-            smallFrame=int(self.defaultFrame/50)
-            print((self.stimuli,smallFrame))
-            data=array(data)
-            for i in self.stimuli:
-                iSample=data[i-self.defaultFrame/2:i]
-                print((iSample,i-self.defaultFrame/2,i,len(data[i-self.defaultFrame/2:i])))
-                iStd,iMean=1,100
-                try:
-                    iMean=mean(iSample)
-                except:
-                    pass
-                try:
-                    iStd=iSample.std()
-                except:
-                    pass
-                print(("*",iStd,iMean))
-                iMask=(iSample<(iMean+iStd))-(iSample<(iMean-iStd/2))#?
-                print(("**",iMask))
-                baselevel=mean(iSample[iMask])
-                std1=std(iSample[iMask])
-                k=smallFrame
-                sample=data[(i-k)-smallFrame/2:(i-k)+smallFrame/2]
-                print((std1,iStd,iMean,baselevel,sample))
-                while(sample.std()>std1 or abs(sample.mean()-baselevel)>std1*3):
-                    k+=smallFrame/2
-                    sample=data[(i-k)-smallFrame/2:(i-k)+smallFrame/2]
-                start=i-k
-                k=i-smallFrame
-                while(abs(data[k]-baselevel)>std1/4):
-                    k+=1
-                stop=k
-                """
-            mask=self.stimulMask
-            patchValues=data[:-100]*mask[100:]
-            data=data*(-mask)
-            #data[100:]+=patchValues
+        if len(self.stimuli[0])!=0:
+            for i in range(len(self.stimuli[0])):
+                pathValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
+                data[self.stimuli[0][i]:self.stimuli[1][i]]=pathValue
+                
             return data
         else:
             return data
@@ -332,29 +296,35 @@ class dataSample:
                 tmpObject=getattr(self,i)
                 listOfSpikes.append([tmpObject.spikeMin])
             ndarrayOfSpikes=array(listOfSpikes)
-            try:
-                clusteredSpikes=fclusterdata(ndarrayOfSpikes,1.1,depth=4,method='average')
-            except:
-                print("fclusterdata error")
-            rightClasterOrder=zeros(clusteredSpikes.size,dtype=int)
-            clusterNumbers=unique(clusteredSpikes)
-            for i in clusterNumbers:
-                k=where(rightClasterOrder==0)[0][0]
-                mask=clusteredSpikes==clusteredSpikes[k]
-                rightClasterOrder+=mask*i
-            if self.debug==1:
-                print((clusteredSpikes,rightClasterOrder))
-            return(rightClasterOrder)
+            rightClasterOrder=zeros(ndarrayOfSpikes.size,dtype=int)
+            if self.isClusterOn==1:
+                print("clusterization is on")
+                try:
+                    clusteredSpikes=fclusterdata(ndarrayOfSpikes,1.1,depth=4,method='average')
+                except:
+                    print("fclusterdata error")                
+                clusterNumbers=unique(clusteredSpikes)
+                for i in clusterNumbers:
+                    k=where(rightClasterOrder==0)[0][0]
+                    mask=clusteredSpikes==clusteredSpikes[k]
+                    rightClasterOrder+=mask*i
+                if self.debug==1:
+                    print((clusteredSpikes,rightClasterOrder))
+                return(rightClasterOrder)
+            else:
+                print("clusterization is off")
+                ndarrayOfSpikes.shape=(1,ndarrayOfSpikes.size)
+                for i in range(len(self.stimuli[0])):
+                    rightClasterOrder[ndarrayOfSpikes[0]>=self.stimuli[0][i]]=i+1
+                return (rightClasterOrder)
         else:
             return(array([1]))
-
+        
 
     def clusterAnalyser(self):
         dictValues=array(self.spikeDict.values())
         clusters=self.clusters
-        #print((clusters,dictValues))
         for i in range(len(dictValues)):
-            #print(i)
             try:
                 tmpObject=getattr(self,dictValues[i])
                 tmpObject.responsNumber=int(clusters[i])
@@ -365,42 +335,61 @@ class dataSample:
                 pass
             
     def responsLength(self):
-        responsMatrix=zeros((len(unique(self.clusters)),2))#[[start1,stop1],[start2,stop2]]
+        responsMatrix=zeros((max(self.clusters),2),dtype=int)#[[start1,stop1],[start2,stop2]]
         length=len(self.result)
-        smallFrame=self.defaultFrame/4
-        #print((responsMatrix,length))
+        smallFrame=self.defaultFrame/5
+        print(len(unique(self.clusters)),len(self.clusters))
         for i in unique(self.clusters):
+            print("0")
             firstSpike=self.spikeDict.values()[list(self.clusters).index(i)]
             try:
                 lastSpike=self.spikeDict.values()[list(self.clusters).index(i+1)-1]
             except:
                 lastSpike=self.spikeDict.values()[-1]
-            #print("*")
-            tmpObject=getattr(self,firstSpike)
-            firstMax=tmpObject.spikeMax1
-            k=firstMax
-            baseLevel=self.result[k-self.defaultFrame:k].mean()
-            std2=self.result[k-self.defaultFrame:k].std()
-            #print((baseLevel,std2))
-            while(abs(self.result[k-smallFrame:k].mean()-baseLevel)>std2/2 or self.result[k-smallFrame:k].std()>std2/2):
-                #print("start")
-                k-=smallFrame/2
-            start=k
-            tmpObject=getattr(self,lastSpike)
-            lastMax=tmpObject.spikeMax2
-            k=lastMax
-            #print(("#",baseLevel,std2))
-            while((abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*4].std()>std2/2) and k<length):
-                k+=smallFrame
-                #print("stop")
-            stop=k
-            #print((start,firstMax,lastMax,stop))
-            responsMatrix[i-1]=start,stop
+            print("1")
+            if self.isClusterOn==1:
+                tmpObject=getattr(self,firstSpike)
+                firstMax=tmpObject.spikeMax1
+                k=firstMax
+                baseLevel=self.result[k-self.defaultFrame:k-smallFrame].mean()
+                std2=self.result[k-self.defaultFrame:k-smallFrame].std()
+                while(abs(self.result[k-smallFrame:k].mean()-baseLevel)>std2/2 or self.result[k-smallFrame:k].std()>std2/2):
+                    k-=smallFrame/2
+                start=k
+                tmpObject=getattr(self,lastSpike)
+                lastMax=tmpObject.spikeMax2
+                k=lastMax
+                while((abs(self.result[k:k+smallFrame*3].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*3].std()>std2/2) and k<length-smallFrame*4):
+                    k+=smallFrame
+                stop=k
+                responsMatrix[i-1]=start,stop
+            else:
+                print("2")
+                start=self.stimuli[0][i-1]
+                baseLevel=self.result[start-smallFrame*2:start].mean()
+                tmpObject=getattr(self,lastSpike)
+                lastMax=tmpObject.spikeMax2
+                k=lastMax
+                std2=self.result[start-smallFrame*2:start].std()
+                try: 
+                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
+                        k+=smallFrame
+                        print((i,k,k+smallFrame*2,self.stimuli[0][i]))
+                except:
+                    print("3")
+                    k=lastMax
+                    std2=self.result[start-smallFrame*2:start].std()
+                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and k<length-smallFrame*4):
+                        k+=smallFrame
+                        
+                stop=k
+                print(("Stop--",stop))
+                responsMatrix[i-1]=start,stop
+                print("4")
         return responsMatrix
     
     def responsAnalysis(self):
         rMatrix=self.responsMatrix
-        #print((len(unique(self.clusters)),self.clusters))
         for i in unique(self.clusters):
             index=len(self.responseDict)
             self.responseDict[index]="r"+str(i)
@@ -414,17 +403,15 @@ class dataSample:
             tmpObject.responsNumber=i
             tmpObject.vpsp=tmpObject.response_top-tmpObject.baselevel
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
-            #print(tmpObject.spikes)
         print(self.responseDict)
         
 
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(self.data[self.dpwr],'r')
+        ax.plot(self.pwr5,'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
-        #ax.plot(self.spikeLevel,'r')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
         try:
             for i in self.responseDict.values():
@@ -448,8 +435,8 @@ class dataSample:
                     pass
         except:
             pass
-        for i in range(len(self.stimuli)):
-            ax.axvline(x=self.stimuli[i],color='g')
+        for i in range(len(self.stimuli[0])):
+            ax.axvline(x=self.stimuli[0][i],color='g')
         #plt.savefig(self.fileName+"_graph.png")
         plt.show()
         #plt.close()# very important to stop memory leak
