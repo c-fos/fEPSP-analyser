@@ -95,12 +95,10 @@ class dataSample:
             self.plotData()
         except:
             print("plotData() complete with error") 
-        """
         try:
             self.writeData()
         except:
             print("writeData() complete with error")
-        """
         
     #0-reading command line arguments
 
@@ -437,9 +435,9 @@ class dataSample:
             pass
         for i in range(len(self.stimuli[0])):
             ax.axvline(x=self.stimuli[0][i],color='g')
-        #plt.savefig(self.fileName+"_graph.png")
-        plt.show()
-        #plt.close()# very important to stop memory leak
+        plt.savefig(self.fileName+"_graph.png")
+        #plt.show()
+        plt.close()# very important to stop memory leak
         del fig
         
     def writeData(self):
