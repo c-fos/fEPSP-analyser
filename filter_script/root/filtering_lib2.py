@@ -399,7 +399,7 @@ class dataSample:
             tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
             tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
             tmpObject.responsNumber=i
-            tmpObject.vpsp=tmpObject.response_top-tmpObject.baselevel
+            tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
         print(self.responseDict)
         
@@ -417,7 +417,7 @@ class dataSample:
                 tmpObject=getattr(self,i)
                 rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd-tmpObject.responseStart, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.3)
                 ax.add_patch(rect)   
-                ax.axhline(y=tmpObject.baselevel,color='g')
+                #ax.axhline(y=tmpObject.baselevel,color='g')
                 ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
                 try:
                     for j in tmpObject.spikes:
@@ -441,13 +441,19 @@ class dataSample:
         del fig
         
     def writeData(self):
-        tmpResponse=-1                
-        for i in range(len(self.spikeDict)):
-            tmpObject=getattr(self,self.spikeDict[i])#self.spikeDict[0])
-            if self.write:    
-                self.mysql_writer.variables_local(tmpObject)
-                if tmpResponse!=self.spikeDict[i].split('r')[1].split('n')[0]:
-                    tmpResponse=self.spikeDict[i].split('r')[1].split('n')[0]
-                    self.mysql_writer.dbWriteResponse()            
-                self.mysql_writer.dbWriteSpike()
-            del tmpObject
+        if self.write:
+            for i in self.responseDict.values():
+                tmpObject=getattr(self,i)
+                self.mysql_writer.dbWriteResponse(tmpObject)
+                for j in tmpObject.spikes:
+                    tmpObject2=getattr(self,j)
+                    self.mysql_writer.dbWriteSpike(tmpObject2)
+                    #del tmpObject2
+            #del tmpObject
+            
+            
+            
+            
+            
+            
+            

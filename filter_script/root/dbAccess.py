@@ -30,7 +30,7 @@ class Mysql_writer:
         except:
             print("Load default database config")
             self.dbServerIp='localhost'
-            self.userName='filteruser'
+            self.userName='filteruser_local'
             self.userPassword='filter123'
             self.dbName='filterdb'
         self.date= strftime('%Y%m%d',localtime(stat(self.fileName).st_mtime))
@@ -61,34 +61,45 @@ class Mysql_writer:
                              FROM experiment \
                              ORDER BY idexperiment\
                              DESC LIMIT 1;")
-        self.idExperiment = cursor.fetchall()[0][0]
+        idExperiment = cursor.fetchall()[0][0]
         cursor.execute("INSERT INTO record(filename,time,numberofresponses,\
                                             experiment_idexperiment)\
-                        VALUES(%s,%s,%s,%s);", (self.fileName,self.time,str(self.numberofresponses),str(self.idExperiment)))
+                        VALUES(%s,%s,%s,%s);", (self.fileName,self.time,str(self.numberofresponses),str(idExperiment)))
         self.conn.commit()
         cursor.close()
 
-    def dbWriteResponse(self):
+    def dbWriteResponse(self,tmpObject):
+        #print("dbWriteResponse")
+        rNumber=tmpObject.responsNumber
+        vpsp=tmpObject.vpsp
+        nOfSpikes=len(tmpObject.spikes)
+        rLength=tmpObject.responseEnd-tmpObject.responseStart
+        
         cursor = self.conn.cursor()
         cursor.execute("SELECT idrecord \
                              FROM record \
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
-        self.idRecord = cursor.fetchall()[0][0]
-        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord)\
-                             VALUES(%s,%s,%s,%s)", (str(self.responsNumber+1),str(self.numberofspikes),str(self.responslength),str(self.idRecord)))
+        idRecord = cursor.fetchall()[0][0]
+        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp)\
+                             VALUES(%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(idRecord),str(vpsp)))
         self.conn.commit()
-        cursor.close() 
+        cursor.close()
 
-    def dbWriteSpike(self):
+    def dbWriteSpike(self,tmpObject):
+        #print("dbWriteSpike")
+        ampl=tmpObject.spikeAmpl
+        number=tmpObject.spikeNumber
+        sLength=tmpObject.spikeMax2-tmpObject.spikeMax1#must be changed to length at 80% or something like that
+        maxdiff=tmpObject.spikeMax2Val-tmpObject.spikeMax1Val
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\
                              ORDER BY idresponses\
                              DESC LIMIT 1;")
-        self.idResponse = cursor.fetchall()[0][0]
-        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses)\
-                             VALUES(%s,%s,%s);", (str(self.ampl),str(self.number+1),str(self.idResponse)))
+        idResponse = cursor.fetchall()[0][0]
+        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff)\
+                             VALUES(%s,%s,%s,%s,%s);", (str(ampl),str(number+1),str(idResponse),str(sLength),str(maxdiff)))
         self.conn.commit()
         cursor.close()
     def dbDisconnect(self):
