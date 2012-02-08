@@ -83,14 +83,6 @@ class dataSample:
             self.responsAnalysis()
         except:
             print("responsAnalysis() complete with error")
-            
-        """     
-        try:
-            self.spikesIntoResponses()
-        except:
-            print("spikesIntoResponses() complete with error")
-
-        """
         try:
             self.plotData()
         except:
@@ -202,19 +194,38 @@ class dataSample:
         stimList=[[],[]]
         for i in range(len(self.dpwr)):
             start=self.dpwr[i]
-            length=(self.dpwrM[i]-self.dpwr[i])*3
-            stop=start+length
+            length=(self.dpwrM[i]-self.dpwr[i])*2
+            baseline=data[start-30:start].mean()
+            tmpStop=start+length
+            sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],10)
+            firstArray=abs(diff(sample))<3
+            secondArray=abs(sample[1:]-baseline)<3
+            print((len(firstArray),len(secondArray)))
+            if len(firstArray)!=0 and len(secondArray)!=0:
+                realStop=tmpStop+where(firstArray*secondArray==True)[0][0]
+            elif len(firstArray)==0:
+                realStop=tmpStop+where(secondArray==True)[0][0]
+            elif len(secondArray)==0:
+                realStop=tmpStop+where(firstArray==True)[0][0]
+            else:
+                realStop=tmpStop
+            if self.debug==1:
+                print((start,tmpStop,realStop,"start,tmpStop and stop of stimule"))
             stimList[0]+=[start]
-            stimList[1]+=[stop]
+            stimList[1]+=[realStop]
         self.stimuli=stimList
 
     def cutStimuli(self,data):
-        self.findStimuli(data)
+        try:
+            self.findStimuli(data)
+        except:
+            print("findStimuli error!")
         if len(self.stimuli[0])!=0:
+            if self.debug==1:
+                print("cut stimuli")
             for i in range(len(self.stimuli[0])):
                 pathValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
-                data[self.stimuli[0][i]:self.stimuli[1][i]]=pathValue
-                
+                data[self.stimuli[0][i]:self.stimuli[1][i]]=pathValue    
             return data
         else:
             return data
@@ -407,7 +418,7 @@ class dataSample:
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(self.pwr5,'r')
+        ax.plot(self.cleanData,'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
@@ -435,9 +446,9 @@ class dataSample:
             pass
         for i in range(len(self.stimuli[0])):
             ax.axvline(x=self.stimuli[0][i],color='g')
-        plt.savefig(self.fileName+"_graph.png")
-        #plt.show()
-        plt.close()# very important to stop memory leak
+        #plt.savefig(self.fileName+"_graph.png")
+        plt.show()
+        #plt.close()# very important to stop memory leak
         del fig
         
     def writeData(self):
