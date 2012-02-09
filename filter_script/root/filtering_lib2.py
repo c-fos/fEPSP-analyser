@@ -7,16 +7,11 @@ Created on 05.12.2011
 '''
 #library for filtering
 from mimetypes import guess_type
-from numpy import math, zeros, arange, loadtxt, std, fromfile, array, int16, unique, where, mean#arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
-#from externalFunctions import iswt, smooth, extrema
-#import sys
-from matplotlib.transforms import Bbox
-from matplotlib.path import Path
+from numpy import zeros, math, ones, diff, loadtxt, fromfile, array, int16, unique, where
+import pywt
 from matplotlib.patches import Rectangle
-
 import matplotlib.pyplot as plt
-from externalFunctions import *
-from dbAccess import *
+from externalFunctions import iswt,extrema,smooth
 from objects import *
 from hcluster import fclusterdata
 
@@ -133,7 +128,7 @@ class dataSample:
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
         self.defaultFrame=5*msec #frame size for mean() and std() finding must depend on frequency. assume it equeal to 5msec
-        self.stimulyDuration=int(1.5*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
+        self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
         self.baseFrequency=150 #we must separate the levels of wavelet decomposition wich contains most part of the signal
         highNoiseFrequency=14000.0
@@ -183,31 +178,34 @@ class dataSample:
 
 
     def findStimuli(self,data):
-        pwr=pywt.swt(data, 'db2', 3)
-        self.pwr2=array(pwr[2][1])
-        treshold=abs(max(self.pwr2))/4
-        self.pwr2[self.pwr2<treshold]=0
-        self.pwr5=smooth(self.pwr2,10)
-        self.pwr5[self.pwr5>0]=treshold 
-        self.dpwr=where((diff(self.pwr5)>treshold/2)==True)[0]
-        self.dpwrM=where((diff(self.pwr5)<-treshold/2)==True)[0]
+        pwr=pywt.swt(data, 'haar', 2)
+        pwr2=array(pwr[0][1])
+        treshold=max(abs(pwr2))/4
+        pwr2[pwr2<treshold]=0
+        pwr2[pwr2>0]=treshold 
+        dpwr=where((diff(pwr2)>treshold/2)==True)[0]
+        dpwrMask=ones(len(dpwr),dtype='bool')
+        for i in range(len(dpwr)-1):
+            if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
+                dpwrMask[i+1]=0
+        dpwr=dpwr[dpwrMask]            
         stimList=[[],[]]
-        for i in range(len(self.dpwr)):
-            start=self.dpwr[i]
-            length=(self.dpwrM[i]-self.dpwr[i])*2
+        for i in range(len(dpwr)):
+            start=dpwr[i]
+            length=self.stimulyDuration/10
             baseline=data[start-30:start].mean()
+            baseStd=data[start-30:start].std()
             tmpStop=start+length
+            stimMean=data[start:tmpStop].mean()
+            if self.debug==1:
+                print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
             sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],10)
-            firstArray=abs(diff(sample))<3
-            secondArray=abs(sample[1:]-baseline)<3
-            print((len(firstArray),len(secondArray)))
-            if len(firstArray)!=0 and len(secondArray)!=0:
-                realStop=tmpStop+where(firstArray*secondArray==True)[0][0]
-            elif len(firstArray)==0:
-                realStop=tmpStop+where(secondArray==True)[0][0]
-            elif len(secondArray)==0:
-                realStop=tmpStop+where(firstArray==True)[0][0]
-            else:
+            firstArray=abs(diff(sample))<=baseStd
+            secondArray=abs(sample[1:]-baseline)<baseStd
+            thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/10
+            try:
+                realStop=tmpStop+where((firstArray+secondArray)*thirdArray==True)[0][0]
+            except:
                 realStop=tmpStop
             if self.debug==1:
                 print((start,tmpStop,realStop,"start,tmpStop and stop of stimule"))
@@ -294,7 +292,8 @@ class dataSample:
                 tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
                 tmpObject.spikeAmpl=ampl
                 tmpObject.calculate()
-        print((self.fileName,self.spikeDict))
+        if self.debug==1:
+            print((self.fileName,self.spikeDict))
      
         
     def clusterization(self):
@@ -307,7 +306,8 @@ class dataSample:
             ndarrayOfSpikes=array(listOfSpikes)
             rightClasterOrder=zeros(ndarrayOfSpikes.size,dtype=int)
             if self.isClusterOn==1:
-                print("clusterization is on")
+                if self.debug==1:
+                    print("clusterization is on")
                 try:
                     clusteredSpikes=fclusterdata(ndarrayOfSpikes,1.1,depth=4,method='average')
                 except:
@@ -321,7 +321,8 @@ class dataSample:
                     print((clusteredSpikes,rightClasterOrder))
                 return(rightClasterOrder)
             else:
-                print("clusterization is off")
+                if self.debug==1:
+                    print("clusterization is off")
                 ndarrayOfSpikes.shape=(1,ndarrayOfSpikes.size)
                 for i in range(len(self.stimuli[0])):
                     rightClasterOrder[ndarrayOfSpikes[0]>=self.stimuli[0][i]]=i+1
@@ -339,7 +340,6 @@ class dataSample:
                 tmpObject.responsNumber=int(clusters[i])
                 k=where(clusters==int(clusters[i]))[0][0]
                 tmpObject.spikeNumber=int(i)-k
-                #print((i,clusters[i],tmpObject.responsNumber,tmpObject.spikeNumber))
             except:
                 pass
             
@@ -347,15 +347,14 @@ class dataSample:
         responsMatrix=zeros((max(self.clusters),2),dtype=int)#[[start1,stop1],[start2,stop2]]
         length=len(self.result)
         smallFrame=self.defaultFrame/5
-        print(len(unique(self.clusters)),len(self.clusters))
+        if self.debug==1:
+            print(len(unique(self.clusters)),len(self.clusters))
         for i in unique(self.clusters):
-            print("0")
             firstSpike=self.spikeDict.values()[list(self.clusters).index(i)]
             try:
                 lastSpike=self.spikeDict.values()[list(self.clusters).index(i+1)-1]
             except:
                 lastSpike=self.spikeDict.values()[-1]
-            print("1")
             if self.isClusterOn==1:
                 tmpObject=getattr(self,firstSpike)
                 firstMax=tmpObject.spikeMax1
@@ -373,7 +372,6 @@ class dataSample:
                 stop=k
                 responsMatrix[i-1]=start,stop
             else:
-                print("2")
                 start=self.stimuli[0][i-1]
                 baseLevel=self.result[start-smallFrame*2:start].mean()
                 tmpObject=getattr(self,lastSpike)
@@ -383,18 +381,16 @@ class dataSample:
                 try: 
                     while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
                         k+=smallFrame
-                        print((i,k,k+smallFrame*2,self.stimuli[0][i]))
+                        if self.debug==1:
+                            print((i,k,k+smallFrame*2,self.stimuli[0][i]))
                 except:
-                    print("3")
                     k=lastMax
                     std2=self.result[start-smallFrame*2:start].std()
                     while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and k<length-smallFrame*4):
                         k+=smallFrame
                         
                 stop=k
-                print(("Stop--",stop))
                 responsMatrix[i-1]=start,stop
-                print("4")
         return responsMatrix
     
     def responsAnalysis(self):
@@ -418,21 +414,18 @@ class dataSample:
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(self.cleanData,'r')
+        #ax.plot(pwr2,'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
         try:
             for i in self.responseDict.values():
-                print(i)
                 tmpObject=getattr(self,i)
                 rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd-tmpObject.responseStart, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.3)
-                ax.add_patch(rect)   
-                #ax.axhline(y=tmpObject.baselevel,color='g')
+                ax.add_patch(rect)
                 ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
                 try:
                     for j in tmpObject.spikes:
-                        print(j)
                         tmpObject2=getattr(self,j)
                         tex = str((tmpObject2.responsNumber,tmpObject2.spikeNumber,tmpObject2.spikeAmpl))
                         ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
@@ -446,7 +439,7 @@ class dataSample:
             pass
         for i in range(len(self.stimuli[0])):
             ax.axvline(x=self.stimuli[0][i],color='g')
-        #plt.savefig(self.fileName+"_graph.png")
+        plt.savefig(self.fileName+"_graph.png")
         plt.show()
         #plt.close()# very important to stop memory leak
         del fig

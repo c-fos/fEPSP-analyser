@@ -32,19 +32,12 @@ usage: "python2 fEPSP-analyser.py $arg1 $arg2 $arg3 $arg4 $arg5"
                 using with graph.py
             saved graph images of every finished input data file in ./results/$input_folder_name/ 
 '''
-#from matplotlib import use as mpluse
-#mpluse('TkAgg')
-import matplotlib.pyplot as plt
-from mimetypes import guess_type 
 from os import stat
 from time import strftime,localtime
 from glob import glob
-import pywt,sys,MySQLdb,pickle
-from numpy import median,abs,arange,zeros,array,math,fromfile,int16, r_,convolve, hanning, hamming, bartlett, blackman, ones,loadtxt,roll,diff,sign,nonzero
-from externalFunctions import *
-from dbAccess import *
-from objects import *
-from filtering_lib2 import *
+import sys,pickle
+from dbAccess import Mysql_writer
+from filtering_lib2 import dataSample
 
 class fepspAnalyser:
     def __init__(self,arguments):
@@ -65,7 +58,7 @@ class fepspAnalyser:
                 try:
                     name="./"+dirName+"/"+str(mysql_writer.time)+".pic"
                     with open(name,"w") as fd:
-                        pickle.dump(dataSample1.result[dataSample1.stimuli[0]:],fd)
+                        pickle.dump(dataSample1.result[dataSample1.stimuli[0][0]:],fd)
                 except: 
                     print("pickle with error")
                 del dataSample1

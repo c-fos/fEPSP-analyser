@@ -1,7 +1,5 @@
 import sys
-
 from PyQt4 import QtCore, QtGui
-
 from simple import Ui_MainWindow
 from graph import graphReconstruction
 from fEPSPanalyser import fepspAnalyser
