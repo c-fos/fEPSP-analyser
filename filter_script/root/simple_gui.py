@@ -1,7 +1,5 @@
 import sys
-
 from PyQt4 import QtCore, QtGui
-
 from simple import Ui_MainWindow
 from graph import graphReconstruction
 from fEPSPanalyser import fepspAnalyser
@@ -79,13 +77,17 @@ class MyForm(QtGui.QMainWindow):
             debug="1"
         else:
             debug="0"
+        if self.ui.clusterizationBox.isChecked():
+            cluster="0"
+        else:
+            cluster="1"
         if self.ui.database_checkBox.isChecked():
             write="1"
         else:
             write="0"
         if debug=="1":
             print((path,frequency,"data","1",substance,debug,write))
-        analyserObject=fepspAnalyser([0,path,frequency,"data","1",substance,debug,write])
+        analyserObject=fepspAnalyser([0,path,frequency,"data","1",substance,debug,write,cluster])
         
     def show_path(self):
         path = self.ui.pathLine.text()#QtGui.QDesktopServices.storageLocati$
@@ -144,6 +146,7 @@ class MyForm(QtGui.QMainWindow):
             debug2="1"
         else:
             debug2="0"
+            
         try:
             self.ui.processedList.selectAll()
             fileList = list(self.ui.processedList.selectedItems())

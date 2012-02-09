@@ -30,7 +30,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="fEPSPanalyser">
      <attribute name="title">
@@ -120,6 +120,19 @@
        <bool>true</bool>
       </property>
      </widget>
+     <widget class="QCheckBox" name="clusterizationBox">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>200</y>
+        <width>241</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>replace clusterization by stimDetect</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -150,6 +163,14 @@
         </rect>
        </property>
        <widget class="QLabel" name="imageLabel">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>8</width>
+          <height>16</height>
+         </rect>
+        </property>
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
           <horstretch>0</horstretch>

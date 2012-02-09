@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'simple.ui'
 #
-# Created: Thu Dec 29 12:05:16 2011
+# Created: Thu Feb  2 16:34:23 2012
 #      by: PyQt4 UI code generator 4.8.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -55,6 +55,9 @@ class Ui_MainWindow(object):
         self.database_checkBox.setGeometry(QtCore.QRect(20, 170, 131, 20))
         self.database_checkBox.setChecked(True)
         self.database_checkBox.setObjectName(_fromUtf8("database_checkBox"))
+        self.clusterizationBox = QtGui.QCheckBox(self.fEPSPanalyser)
+        self.clusterizationBox.setGeometry(QtCore.QRect(20, 200, 241, 20))
+        self.clusterizationBox.setObjectName(_fromUtf8("clusterizationBox"))
         self.tabWidget.addTab(self.fEPSPanalyser, _fromUtf8(""))
         self.tab = QtGui.QWidget()
         self.tab.setObjectName(_fromUtf8("tab"))
@@ -67,6 +70,7 @@ class Ui_MainWindow(object):
         self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 307, 287))
         self.scrollAreaWidgetContents.setObjectName(_fromUtf8("scrollAreaWidgetContents"))
         self.imageLabel = QtGui.QLabel(self.scrollAreaWidgetContents)
+        self.imageLabel.setGeometry(QtCore.QRect(0, 0, 8, 16))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -222,7 +226,7 @@ class Ui_MainWindow(object):
         self.pathLabel.setBuddy(self.pathLine)
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(1)
+        self.tabWidget.setCurrentIndex(0)
         QtCore.QObject.connect(self.exitButton, QtCore.SIGNAL(_fromUtf8("clicked()")), MainWindow.close)
         QtCore.QObject.connect(self.clearList, QtCore.SIGNAL(_fromUtf8("clicked()")), self.processedList.clear)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -235,6 +239,7 @@ class Ui_MainWindow(object):
         self.label_3.setText(QtGui.QApplication.translate("MainWindow", "substance", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("MainWindow", "frequency", None, QtGui.QApplication.UnicodeUTF8))
         self.database_checkBox.setText(QtGui.QApplication.translate("MainWindow", "write to database", None, QtGui.QApplication.UnicodeUTF8))
+        self.clusterizationBox.setText(QtGui.QApplication.translate("MainWindow", "replace clusterization by stimDetect", None, QtGui.QApplication.UnicodeUTF8))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.fEPSPanalyser), QtGui.QApplication.translate("MainWindow", "fEPSP-analyser", None, QtGui.QApplication.UnicodeUTF8))
         self.createListButton.setText(QtGui.QApplication.translate("MainWindow", "создать список", None, QtGui.QApplication.UnicodeUTF8))
         self.graphButton.setText(QtGui.QApplication.translate("MainWindow", "graph", None, QtGui.QApplication.UnicodeUTF8))
