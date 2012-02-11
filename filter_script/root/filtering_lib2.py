@@ -6,14 +6,16 @@ Created on 05.12.2011
 @author: pilat
 '''
 #library for filtering
+import sys
 from mimetypes import guess_type
-from numpy import zeros, math, ones, diff, loadtxt, fromfile, array, int16, unique, where
+from numpy import zeros,linspace, math, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
-from objects import *
+from objects import Spike,Response
 from hcluster import fclusterdata
+from scipy.interpolate import spline
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -103,7 +105,7 @@ class dataSample:
 
     def dataLoading(self):
         if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
-            self.data = loadtxt(self.fileName)
+            self.data = loadtxt(self.fileName,dtype='float32')
             self.data = self.dataFitting(self.data,self.frequency)
         else:
             self.data=fromfile(self.fileName,int16)
@@ -115,7 +117,7 @@ class dataSample:
     def dataFitting(self,data,frequency):
         tmp=2**(math.ceil(math.log(len(data),2)))
         delay=2*frequency/1000#asume that first 2 msec doesn`t contain any signal 
-        newData=zeros(tmp)
+        newData=zeros(tmp, dtype='float32')
         deltaLen=tmp-len(data)
         for j in range(int(math.ceil(deltaLen/delay))):
             for k in range(delay):
@@ -139,7 +141,7 @@ class dataSample:
     def snrFinding(self,data,frameSize):
         minSD=data[:frameSize].std()
         maxSD=max(data)-min(data)
-        snr=int(maxSD/minSD)
+        snr=float16(maxSD/minSD)
         return snr
 
 
@@ -232,7 +234,7 @@ class dataSample:
     def mainLevelFinding(self):
         if self.debug==1:
             print(self.snr)
-        self.mainLevel=int((math.log((self.baseFrequency-4.0*(self.baseFrequency/self.snr))/self.frequency,0.5))-2)#
+        self.mainLevel=int((math.log((self.baseFrequency-4*(self.baseFrequency/self.snr))/self.frequency,0.5))-2)#
         if self.debug==1:
             print(self.mainLevel)
     
@@ -242,7 +244,7 @@ class dataSample:
         for i in range(len(self.coeffs)):
             cA, cD = self.coeffs[i]
             if i>=(len(self.coeffs)-self.highNoiseLevel):
-                cD=zeros(len(cA))
+                cD=zeros(len(cA),dtype='float32')
                 if self.debug==1:
                     print(("noisLevel",i))
             else:
@@ -393,6 +395,59 @@ class dataSample:
                 responsMatrix[i-1]=start,stop
         return responsMatrix
     
+    def epspReconstructor(self,tmpObject):
+        import pylab as pl
+        print("0")
+        sample=self.result[tmpObject.responseStart:tmpObject.responseEnd]
+        mask=zeros(len(sample),dtype='bool')
+        print("1")
+        tmpObject2=getattr(self,tmpObject.spikes[-1])
+        mask[tmpObject2.spikeMax2-tmpObject.responseStart:]=1
+        mask2=array(range(len(mask)))%300==0
+        mask2=mask*mask2  
+        mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+        mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        tmpObject2=getattr(self,tmpObject.spikes[0])
+        mask2[:tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        mask[:tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+        mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        try:
+            tmpObject2=getattr(self,tmpObject.spikes[1])
+            mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+            mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+        except:
+            pass
+        timePoints=where(mask2==True)[0]
+        missedPoints=where(mask==False)[0]
+        print("2")
+        values=sample[mask2]
+        print((timePoints, values))
+        sample2=array(range(len(sample)))
+        print((len(timePoints),len(values),len(sample2),"len(timePoints),len(values),len(computed_time)"))
+        print((timePoints[0],sample2[0],timePoints[-1],sample2[-1]))
+        try:
+            sp = spline(timePoints,int16(values), missedPoints, order=3)
+        except:
+            print "Unexpected error:", sys.exc_info()
+            raise
+        print("6")
+        try:
+            pl.plot(timePoints, values, 'o', ms=6, label='measures')
+        except:
+            pass
+        try:
+            pl.plot(missedPoints, sp, label='cubic interp')
+        except:
+            pass
+        try:
+            pl.legend()
+            pl.show()
+        except:
+            print("5")
+                        
+ 
+    
     def responsAnalysis(self):
         rMatrix=self.responsMatrix
         for i in unique(self.clusters):
@@ -408,13 +463,17 @@ class dataSample:
             tmpObject.responsNumber=i
             tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
+            try:
+                self.epspReconstructor(tmpObject)
+            except:
+                print(("respons",i,"reconstructed with error"))
         print(self.responseDict)
         
 
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        #ax.plot(pwr2,'r')
+        #ax.plot(self.testEPSP,'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
