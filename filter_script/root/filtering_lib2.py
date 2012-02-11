@@ -3,7 +3,7 @@
 '''
 Created on 05.12.2011
 
-@author: pilat
+@author:  pilat
 '''
 #library for filtering
 from mimetypes import guess_type
