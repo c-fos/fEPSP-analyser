@@ -22,11 +22,30 @@ pl.show()
 import numpy as np
 import pylab as pl
 import scipy
-import scipy.interpolate
-x = np.array([0,1,2,3,4,10,55,70,78,100,101,102,103])#np.linspace(0, 1, 10)
-y = np.array([1,1,1.1,1.1,1.1,1.1,2.3,1.7,1.6,1.43,1.41,1.43,1.41])
-sp = scipy.interpolate.spline(x,y, np.array(range(103)),kind='smoothest')
+import scipy.interpolate as inter
+#Rbf, InterpolatedUnivariateSpline
+x = np.array([1,2,3,4,10,55,70,78,100,101,102,103])#np.linspace(0, 1, 10)
+y = np.array([1,1.05,1.1,1.1,1.1,2.3,1.7,1.6,1.43,1.41,1.43,1.41])
+sp = inter.spline(x,y, np.array(range(103)),kind='smoothest')
+x2=np.array(range(103))
+f=inter.Rbf(x,y,smooth=0.0005)
+f2=inter.Rbf(x,y,smooth=0.0005,function='thin_plate')
+'''
+
+        'multiquadric': sqrt((r/self.epsilon)**2 + 1)
+        'inverse': 1.0/sqrt((r/self.epsilon)**2 + 1)
+        'gaussian': exp(-(r/self.epsilon)**2)
+        'linear': r
+        'cubic': r**3
+        'quintic': r**5
+        'thin_plate': r**2 * log(r)
+'''
+
+y2=f(x2)
+y3=f2(x2)
 print(sp) # should be a good approximation of cos(0.5)=0.8775
 pl.plot(x,y,'o',ms=6)
-pl.plot(np.array(range(103)),sp)
+pl.plot(np.array(range(103)),sp,'r')
+pl.plot(x2,y2,'g')
+pl.plot(x2,y3,'y')
 pl.show()

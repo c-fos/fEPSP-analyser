@@ -8,14 +8,14 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros,linspace, math, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, append, math, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
 from hcluster import fclusterdata
-from scipy.interpolate import spline
+from scipy.interpolate import spline, Rbf
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -397,10 +397,10 @@ class dataSample:
     
     def epspReconstructor(self,tmpObject):
         import pylab as pl
-        print("0")
+        #print("0")
         sample=self.result[tmpObject.responseStart:tmpObject.responseEnd]
         mask=zeros(len(sample),dtype='bool')
-        print("1")
+        #print("1")
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         mask[tmpObject2.spikeMax2-tmpObject.responseStart:]=1
         mask2=array(range(len(mask)))%300==0
@@ -420,36 +420,81 @@ class dataSample:
             pass
         timePoints=where(mask2==True)[0]
         missedPoints=where(mask==False)[0]
-        print("2")
+        #print("2")
         values=sample[mask2]
-        print((timePoints, values))
+        #print((timePoints, values))
         sample2=array(range(len(sample)))
-        print((len(timePoints),len(values),len(sample2),"len(timePoints),len(values),len(computed_time)"))
-        print((timePoints[0],sample2[0],timePoints[-1],sample2[-1]))
+        #print((len(timePoints),len(values),len(sample2),"len(timePoints),len(values),len(computed_time)"))
+        #print((timePoints[0],sample2[0],timePoints[-1],sample2[-1]))
         try:
-            sp = spline(timePoints,int16(values), missedPoints, order=3)
+            
+            #sp = spline(timePoints,int16(values), missedPoints, order=3)
+            #sp2 = Rbf(timePoints,int16(values),smooth=0.0001)#function='thin_plate'
+            sp3 = Rbf(timePoints,int16(values),smooth=0.0001,function='thin_plate')
+            #y2=sp2(missedPoints)
+            reconstPoints=array(range(len(mask2)))
+            y3=sp3(missedPoints)
+            y4=sp3(reconstPoints)
+            front,back = self.epspAnaliser(y4)
+            self.epsp=append(self.epsp,[missedPoints+tmpObject.responseStart,y3],axis=1)
+            print(front,back)
+            
         except:
             print "Unexpected error:", sys.exc_info()
             raise
-        print("6")
+        #print("6")
         try:
             pl.plot(timePoints, values, 'o', ms=6, label='measures')
         except:
             pass
         try:
-            pl.plot(missedPoints, sp, label='cubic interp')
+            #pl.plot(missedPoints, sp, label='cubic interp')
+            #pl.plot(missedPoints,y2,'r')
+            pl.plot(missedPoints,y3,'y')
         except:
             pass
+        #try:
+        #    pl.legend()
+        #    pl.show()
+        #except:
+            #print("5")
+    
+    def epspAnaliser(self,y):
+        maxvalue=max(y)
+        maxPoint=where(y==maxvalue)[0]
+        minvalue1=min(y[:maxPoint])
+        minvalue2=min(y[maxPoint:])
+        ampl1=maxvalue-minvalue1
+        ampl2=maxvalue-minvalue2
         try:
-            pl.legend()
-            pl.show()
+            firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0][0]
         except:
-            print("5")
+            firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0]
+        firstValue=y[firstPoint]
+        try:
+            secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0][0]
+        except:
+            secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0]
+        secondValue=y[secondPoint]
+        try:
+            thirdPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.8)[0][0]
+        except:
+            thirdPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.8)[0]
+        thirdValue=y[thirdPoint]
+        try:
+            fourthPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.2)[0][0]
+        except:
+            fourthPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.2)[0]
+        fourthValue=y[fourthPoint]
+        front=(secondValue-firstValue)/(secondPoint-firstPoint)
+        back=(fourthValue-thirdValue)/(fourthPoint-thirdPoint)
+        return front,back
                         
  
     
     def responsAnalysis(self):
         rMatrix=self.responsMatrix
+        self.epsp=array([[],[]])
         for i in unique(self.clusters):
             index=len(self.responseDict)
             self.responseDict[index]="r"+str(i)
@@ -473,7 +518,7 @@ class dataSample:
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        #ax.plot(self.testEPSP,'r')
+        ax.plot(self.epsp[0],self.epsp[1],'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
