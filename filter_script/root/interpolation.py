@@ -21,6 +21,7 @@ pl.show()
 '''
 import numpy as np
 import pylab as pl
+from scipy import linspace, polyval, polyfit, sqrt, stats, randn
 import scipy
 import scipy.interpolate as inter
 #Rbf, InterpolatedUnivariateSpline
@@ -30,6 +31,8 @@ sp = inter.spline(x,y, np.array(range(103)),kind='smoothest')
 x2=np.array(range(103))
 f=inter.Rbf(x,y,smooth=0.0005)
 f2=inter.Rbf(x,y,smooth=0.0005,function='thin_plate')
+ar=polyfit(x[5:],y[5:],2)
+xr=polyval(ar,x[5:])
 '''
 
         'multiquadric': sqrt((r/self.epsilon)**2 + 1)
@@ -48,4 +51,5 @@ pl.plot(x,y,'o',ms=6)
 pl.plot(np.array(range(103)),sp,'r')
 pl.plot(x2,y2,'g')
 pl.plot(x2,y3,'y')
+pl.plot(x[5:],xr)
 pl.show()

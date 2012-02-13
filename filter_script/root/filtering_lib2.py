@@ -16,6 +16,7 @@ from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
 from hcluster import fclusterdata
 from scipy.interpolate import spline, Rbf
+from scipy import polyval, polyfit
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -392,72 +393,65 @@ class dataSample:
                         k+=smallFrame
                         
                 stop=k
-                responsMatrix[i-1]=start,stop
+                try:
+                    sampleLen=stop-lastMax
+                    ar=polyfit(array(range(sampleLen)),self.result[lastMax:stop],2)
+                    sample=polyval(ar,array(range(sampleLen)))
+                    realStop=lastMax+where(diff(sample)>=-0.001)[0][0]
+                    responsMatrix[i-1]=start,realStop
+                except:
+                    responsMatrix[i-1]=start,stop
+                    print "Unexpected error:", sys.exc_info()
+                    raise
         return responsMatrix
     
     def epspReconstructor(self,tmpObject):
-        import pylab as pl
-        #print("0")
-        sample=self.result[tmpObject.responseStart:tmpObject.responseEnd]
-        mask=zeros(len(sample),dtype='bool')
-        #print("1")
         tmpObject2=getattr(self,tmpObject.spikes[-1])
-        mask[tmpObject2.spikeMax2-tmpObject.responseStart:]=1
-        mask2=array(range(len(mask)))%300==0
-        mask2=mask*mask2  
-        mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-        mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        #before lastMax of lastSpike
+        sample1=self.result[tmpObject.responseStart:tmpObject2.spikeMax2]     
+        mask1=zeros(len(sample1),dtype='bool')
         tmpObject2=getattr(self,tmpObject.spikes[0])
-        mask2[:tmpObject2.spikeMax1-tmpObject.responseStart]=1
-        mask[:tmpObject2.spikeMax1-tmpObject.responseStart]=1
-        mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-        mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        mask1[0]=1
+        mask1[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+        mask1[tmpObject2.spikeMax1-tmpObject.responseStart]=1
         try:
             tmpObject2=getattr(self,tmpObject.spikes[1])
-            mask2[tmpObject2.spikeMax1-tmpObject.responseStart]=1
-            mask2[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+            mask1[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+            mask1[tmpObject2.spikeMax2-tmpObject.responseStart]=1
         except:
             pass
-        timePoints=where(mask2==True)[0]
-        missedPoints=where(mask==False)[0]
-        #print("2")
-        values=sample[mask2]
-        #print((timePoints, values))
-        sample2=array(range(len(sample)))
-        #print((len(timePoints),len(values),len(sample2),"len(timePoints),len(values),len(computed_time)"))
-        #print((timePoints[0],sample2[0],timePoints[-1],sample2[-1]))
-        try:
-            
-            #sp = spline(timePoints,int16(values), missedPoints, order=3)
-            #sp2 = Rbf(timePoints,int16(values),smooth=0.0001)#function='thin_plate'
+        #after lastMax of lastSpike (curve reconstruction)
+        tmpObject2=getattr(self,tmpObject.spikes[-1])
+        sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
+        mask2=zeros(len(sample2),dtype='bool')
+        sample2Points=array(range(len(sample2)))
+        ar1=Rbf(sample2Points[sample2Points%200==0],sample2[sample2Points%200==0],smooth=0.01)#,function='gaussian')
+        xr1=ar1(sample2Points)
+        step=len(sample2Points)/8
+        for i in range(8):
+            mask2[step*i]=1
+        mask2[-1]=1
+        #append
+        mask=append(mask1,mask2)
+        sample=append(sample1,xr1)
+        if self.debug==1:
+            print((len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd]),"len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd])"))
+        timePoints=where(mask==True)[0]
+        values=sample[mask]
+        sample3=array(range(len(sample)))
+        try:           
+            #sp2 = Rbf(timePoints,int16(values),smooth=0.0001)
             sp3 = Rbf(timePoints,int16(values),smooth=0.0001,function='thin_plate')
-            #y2=sp2(missedPoints)
-            reconstPoints=array(range(len(mask2)))
-            y3=sp3(missedPoints)
-            y4=sp3(reconstPoints)
+            y4=sp3(sample3)
             front,back = self.epspAnaliser(y4)
-            self.epsp=append(self.epsp,[missedPoints+tmpObject.responseStart,y3],axis=1)
-            print(front,back)
+            self.epsp=append(self.epsp,[sample3+tmpObject.responseStart,y4],axis=1)
+            if self.debug==1:
+                print((front,back,"front,back"))
             
         except:
             print "Unexpected error:", sys.exc_info()
             raise
-        #print("6")
-        try:
-            pl.plot(timePoints, values, 'o', ms=6, label='measures')
-        except:
-            pass
-        try:
-            #pl.plot(missedPoints, sp, label='cubic interp')
-            #pl.plot(missedPoints,y2,'r')
-            pl.plot(missedPoints,y3,'y')
-        except:
-            pass
-        #try:
-        #    pl.legend()
-        #    pl.show()
-        #except:
-            #print("5")
+        return front,back
     
     def epspAnaliser(self,y):
         maxvalue=max(y)
@@ -466,29 +460,17 @@ class dataSample:
         minvalue2=min(y[maxPoint:])
         ampl1=maxvalue-minvalue1
         ampl2=maxvalue-minvalue2
-        try:
-            firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0][0]
-        except:
-            firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0]
+        firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0][0]
         firstValue=y[firstPoint]
-        try:
-            secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0][0]
-        except:
-            secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0]
+        secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0][0]
         secondValue=y[secondPoint]
-        try:
-            thirdPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.8)[0][0]
-        except:
-            thirdPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.8)[0]
+        thirdPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.8)[0][0]
         thirdValue=y[thirdPoint]
-        try:
-            fourthPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.2)[0][0]
-        except:
-            fourthPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.2)[0]
+        fourthPoint=maxPoint+where(y[maxPoint:]<minvalue2+ampl2*0.2)[0][0]
         fourthValue=y[fourthPoint]
         front=(secondValue-firstValue)/(secondPoint-firstPoint)
         back=(fourthValue-thirdValue)/(fourthPoint-thirdPoint)
-        return front,back
+        return float32(front), float32(back[0])
                         
  
     
@@ -509,7 +491,8 @@ class dataSample:
             tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
             try:
-                self.epspReconstructor(tmpObject)
+                tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
+                
             except:
                 print(("respons",i,"reconstructed with error"))
         print(self.responseDict)
@@ -518,9 +501,9 @@ class dataSample:
     def plotData(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(self.epsp[0],self.epsp[1],'r')
         ax.plot(self.data,'y')
         ax.plot(self.result,'b')
+        ax.plot(self.epsp[0],self.epsp[1],'r')
         ax.grid(color='k', linestyle='-', linewidth=0.4)
         try:
             for i in self.responseDict.values():
@@ -544,7 +527,7 @@ class dataSample:
         for i in range(len(self.stimuli[0])):
             ax.axvline(x=self.stimuli[0][i],color='g')
         plt.savefig(self.fileName+"_graph.png")
-        plt.show()
+        #plt.show()
         #plt.close()# very important to stop memory leak
         del fig
         
