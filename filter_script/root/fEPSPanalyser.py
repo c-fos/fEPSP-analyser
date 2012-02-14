@@ -38,41 +38,57 @@ from glob import glob
 import sys,pickle
 from dbAccess import Mysql_writer
 from filtering_lib2 import dataSample
+import shutil
 
 class fepspAnalyser:
     def __init__(self,arguments):
         print(arguments)
-        dirName = str(arguments[1])
-        fileList=glob("./"+dirName+"/*.dat")
-        mysql_writer=Mysql_writer(str(fileList[0]),arguments[5])
+        dirPath = str(arguments[1])
+        fileList=glob(dirPath+"/*.dat")
+        print(fileList)
         if int(arguments[7]):
+            mysql_writer=Mysql_writer(fileList[0],arguments[5])
             print("write to database enabled")    
             mysql_writer.dbWriteExperiment()
-        for i in range(len(fileList)):
+        else:
+            mysql_writer="pass"
+        for i in fileList:
+            fileName=i.split('/')[-1]
             try:
-                mysql_writer.fileName=str(fileList[i])
-                mysql_writer.time= strftime('%H%M%S',localtime(stat(fileList[i]).st_mtime))
+                creatingTime=strftime('%H%M%S',localtime(stat(i).st_mtime))
                 if int(arguments[7]):
+                    mysql_writer.filePath=i
+                    mysql_writer.time = creatingTime
                     mysql_writer.dbWriteRecord()
-                dataSample1=dataSample(str(fileList[i]),mysql_writer,arguments)
-                try:
-                    name="./"+dirName+"/"+str(mysql_writer.time)+".pic"
-                    with open(name,"w") as fd:
-                        pickle.dump(dataSample1.result[dataSample1.stimuli[0][0]:],fd)
-                except: 
-                    print "Unexpected error in pickle:", sys.exc_info()
-                    raise
+                dataSample1=dataSample(i,mysql_writer,arguments)
+                dataSample1.dataProcessing()
+                if dataSample1.errorState==1:
+                    try:
+                        print "copy file with trouble to separate directory"
+                        shutil.copy2(i,"./mustChecked/")
+                    except:
+                        print "Unexpected error during copy:", sys.exc_info()
+                        raise
+                else:
+                    try:
+                        name=dirPath+"/"+str(creatingTime)+"_"+fileName+".pic"
+                        with open(name,"w") as fd:
+                            pickle.dump(dataSample1.result[dataSample1.stimuli[0][0]:],fd)
+                    except: 
+                        print "Unexpected error in pickle:", sys.exc_info()
+                        raise
                 del dataSample1
             except:
                 try:
                     del dataSample1
                 except:
                     pass
-        try:
-            mysql_writer.dbDisconnect()
-        except:
-            print "Unexpected error in dbDisconect:", sys.exc_info()
-            raise
+        if int(arguments[7]):
+            try:
+                mysql_writer.dbDisconnect()
+            except:
+                print "Unexpected error in dbDisconect:", sys.exc_info()
+                #raise
         
 if __name__ == "__main__":
     analyserObject=fepspAnalyser(sys.argv)

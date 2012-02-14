@@ -11,11 +11,12 @@ import sys,MySQLdb,pickle
 
 class Mysql_writer:
     
-    def __init__(self,filename,substance):
-        self.fileName=filename
+    def __init__(self,filePath,substance):
+        self.filePath=filePath
         self.variables_global()
         self.dbConnect()
         self.substanceName=substance
+        self.numberOfResponses=1#must be refactored!
         
     def variables_global(self):
         try:
@@ -33,8 +34,7 @@ class Mysql_writer:
             self.userName='filteruser_local'
             self.userPassword='filter123'
             self.dbName='filterdb'
-        self.date= strftime('%Y%m%d',localtime(stat(self.fileName).st_mtime))
-        self.numberofresponses=1
+        self.date= strftime('%Y%m%d',localtime(stat(self.filePath).st_mtime))
 
     def variables_local(self,tmpObject):#
         self.responsNumber=tmpObject.responsNumber
@@ -56,6 +56,7 @@ class Mysql_writer:
         self.conn.commit()
         cursor.close()
     def dbWriteRecord(self):
+        fileName="%s/%s" % (self.filePath.split('/')[-2],self.filePath.split('/')[-1])
         cursor = self.conn.cursor()
         cursor.execute("SELECT idexperiment \
                              FROM experiment \
@@ -64,7 +65,7 @@ class Mysql_writer:
         idExperiment = cursor.fetchall()[0][0]
         cursor.execute("INSERT INTO record(filename,time,numberofresponses,\
                                             experiment_idexperiment)\
-                        VALUES(%s,%s,%s,%s);", (self.fileName,self.time,str(self.numberofresponses),str(idExperiment)))
+                        VALUES(%s,%s,%s,%s);", (fileName,self.time,str(self.numberOfResponses),str(idExperiment)))
         self.conn.commit()
         cursor.close()
 
