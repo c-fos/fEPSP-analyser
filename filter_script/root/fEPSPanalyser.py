@@ -60,7 +60,8 @@ class fepspAnalyser:
                     with open(name,"w") as fd:
                         pickle.dump(dataSample1.result[dataSample1.stimuli[0][0]:],fd)
                 except: 
-                    print("pickle with error")
+                    print "Unexpected error in pickle:", sys.exc_info()
+                    raise
                 del dataSample1
             except:
                 try:
@@ -70,7 +71,8 @@ class fepspAnalyser:
         try:
             mysql_writer.dbDisconnect()
         except:
-            pass
+            print "Unexpected error in dbDisconect:", sys.exc_info()
+            raise
         
 if __name__ == "__main__":
     analyserObject=fepspAnalyser(sys.argv)

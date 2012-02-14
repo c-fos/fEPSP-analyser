@@ -33,6 +33,8 @@ class dataSample:
             self.argReading()#0
         except:
             print("argReading() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         if self.debug==1:
             print(self.fileName)
         ##
@@ -40,55 +42,81 @@ class dataSample:
             self.dataLoading()
         except:
             print("dataLoading() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.tresholdCreating() 
         except:
             print("tresholdCreating() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.cleanData=self.cutStimuli(self.data)
         except:
-            print("cutStimuli() complete with error")  
+            print("cutStimuli() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise 
         try: 
             self.snr=self.snrFinding(self.cleanData,self.defaultFrame)
         except:
-            print("snrFinding() complete with error")  
+            print("snrFinding() complete with error") 
+            print "Unexpected error:", sys.exc_info()
+            raise 
         try:
             self.mainLevelFinding()
         except:
             print("mainLevelFinding() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.filtering()
         except:
             print("filtering() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
             
         try:
             self.spikeFinding()
         except:
             print("spikeFinding() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.clusters=self.clusterization()
         except:
-            print("clusterization() complete with error") 
+            print("clusterization() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.clusterAnalyser()
         except:
-            print("clusterAnalyser() complete with error")   
+            print("clusterAnalyser() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise   
         try:
             self.responsMatrix=self.responsLength()
         except:
             print("responsLength() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.responsAnalysis()
         except:
             print("responsAnalysis() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.plotData()
         except:
-            print("plotData() complete with error") 
+            print("plotData() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         try:
             self.writeData()
         except:
             print("writeData() complete with error")
+            print "Unexpected error:", sys.exc_info()
+            raise
         
     #0-reading command line arguments
 
@@ -209,6 +237,7 @@ class dataSample:
             try:
                 realStop=tmpStop+where((firstArray+secondArray)*thirdArray==True)[0][0]
             except:
+                print "Unexpected error in finding of stimuli end:", sys.exc_info()
                 realStop=tmpStop
             if self.debug==1:
                 print((start,tmpStop,realStop,"start,tmpStop and stop of stimule"))
@@ -220,7 +249,8 @@ class dataSample:
         try:
             self.findStimuli(data)
         except:
-            print("findStimuli error!")
+            print "Unexpected error in findStimuli", sys.exc_info()
+            raise
         if len(self.stimuli[0])!=0:
             if self.debug==1:
                 print("cut stimuli")
@@ -314,7 +344,8 @@ class dataSample:
                 try:
                     clusteredSpikes=fclusterdata(ndarrayOfSpikes,1.1,depth=4,method='average')
                 except:
-                    print("fclusterdata error")                
+                    print "Unexpected error in fclusterdata:", sys.exc_info()
+                    raise           
                 clusterNumbers=unique(clusteredSpikes)
                 for i in clusterNumbers:
                     k=where(rightClasterOrder==0)[0][0]
@@ -344,7 +375,8 @@ class dataSample:
                 k=where(clusters==int(clusters[i]))[0][0]
                 tmpObject.spikeNumber=int(i)-k
             except:
-                pass
+                print "Unexpected error in cluster analisys:", sys.exc_info()
+                raise
             
     def responsLength(self):
         responsMatrix=zeros((max(self.clusters),2),dtype=int)#[[start1,stop1],[start2,stop2]]
@@ -401,7 +433,7 @@ class dataSample:
                     responsMatrix[i-1]=start,realStop
                 except:
                     responsMatrix[i-1]=start,stop
-                    print "Unexpected error:", sys.exc_info()
+                    print "Unexpected error in response length findind:", sys.exc_info()
                     raise
         return responsMatrix
     
@@ -419,7 +451,8 @@ class dataSample:
             mask1[tmpObject2.spikeMax1-tmpObject.responseStart]=1
             mask1[tmpObject2.spikeMax2-tmpObject.responseStart]=1
         except:
-            pass
+            print "there is no second spike?:", sys.exc_info()
+            raise
         #after lastMax of lastSpike (curve reconstruction)
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
@@ -449,7 +482,7 @@ class dataSample:
                 print((front,back,"front,back"))
             
         except:
-            print "Unexpected error:", sys.exc_info()
+            print "Unexpected error in reconstruction:", sys.exc_info()
             raise
         return front,back
     
@@ -494,7 +527,8 @@ class dataSample:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
                 
             except:
-                print(("respons",i,"reconstructed with error"))
+                print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
+                raise
         print(self.responseDict)
         
 
@@ -521,14 +555,16 @@ class dataSample:
                         ax.vlines(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin], self.result[tmpObject2.spikeMin]+tmpObject2.spikeAmpl, color='k', linestyles='dashed')
                         ax.text(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin]-15, tex, fontsize=12, va='bottom')
                 except:
-                    pass
+                    print "Unexpected error wile spike ploating:", sys.exc_info()
+                    raise
         except:
-            pass
+            print "Unexpected error wile ploating:", sys.exc_info()
+            raise
         for i in range(len(self.stimuli[0])):
             ax.axvline(x=self.stimuli[0][i],color='g')
         plt.savefig(self.fileName+"_graph.png")
         #plt.show()
-        #plt.close()# very important to stop memory leak
+        plt.close()# very important to stop memory leak
         del fig
         
     def writeData(self):
