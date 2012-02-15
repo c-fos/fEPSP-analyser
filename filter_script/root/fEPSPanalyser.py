@@ -50,6 +50,7 @@ class fepspAnalyser:
             mysql_writer=Mysql_writer(fileList[0],arguments[5])
             print("write to database enabled")    
             mysql_writer.dbWriteExperiment()
+            mysql_writer.tagWriter()
         else:
             mysql_writer="pass"
         for i in fileList:

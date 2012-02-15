@@ -11,13 +11,43 @@ import sys,MySQLdb,pickle
 
 class Mysql_writer:
     
-    def __init__(self,filePath,substance):
+    def __init__(self,filePath,tagString):
         self.filePath=filePath
         self.variables_global()
         self.dbConnect()
-        self.substanceName=substance
+        self.tagString=tagString
         self.numberOfResponses=1#must be refactored!
         
+    def tagWriter(self):
+        tagList= self.tagString.split(',')
+        if len(tagList)>0:
+            cursor = self.conn.cursor()
+            for i in tagList:
+                tagId = self.tagCheck(i)
+                cursor.execute("INSERT INTO experimentTags(experiment_idexperiment,tagTable_tagId)\
+                             VALUES (%s,%s);", (self.idExperiment,tagId))
+            self.conn.commit()
+            cursor.close()   
+        
+
+    def tagCheck(self,tag):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT tagId \
+                             FROM tagTable \
+                             WHERE tagName='%s';" % tag)
+        try:
+            tagId = cursor.fetchall()[0][0]
+        except:
+            print "there are no '%s' tag" % tag, sys.exc_info()
+            cursor.execute("INSERT INTO tagTable(tagName)\
+                             VALUES ('%s');" % tag)
+            self.conn.commit()
+            cursor.execute("SELECT tagId \
+                             FROM tagTable \
+                             WHERE tagName='%s';" % tag)
+            tagId = cursor.fetchall()[0][0]
+        return tagId
+                
     def variables_global(self):
         try:
             fd=open("dbConfig",'r')
@@ -49,23 +79,25 @@ class Mysql_writer:
         except:
             print "Db connect error"
             sys.exit(1)
+            
     def dbWriteExperiment(self):
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO experiment(date,substance)\
-                             VALUES (%s,%s);", (self.date,self.substanceName))
+        cursor.execute("INSERT INTO experiment(date)\
+                             VALUES (%s);", (self.date))
         self.conn.commit()
-        cursor.close()
-    def dbWriteRecord(self):
-        fileName="%s/%s" % (self.filePath.split('/')[-2],self.filePath.split('/')[-1])
-        cursor = self.conn.cursor()
         cursor.execute("SELECT idexperiment \
                              FROM experiment \
                              ORDER BY idexperiment\
                              DESC LIMIT 1;")
-        idExperiment = cursor.fetchall()[0][0]
+        self.idExperiment = cursor.fetchall()[0][0]
+        cursor.close()
+        
+    def dbWriteRecord(self):
+        fileName="%s/%s" % (self.filePath.split('/')[-2],self.filePath.split('/')[-1])
+        cursor = self.conn.cursor()
         cursor.execute("INSERT INTO record(filename,time,numberofresponses,\
                                             experiment_idexperiment)\
-                        VALUES(%s,%s,%s,%s);", (fileName,self.time,str(self.numberOfResponses),str(idExperiment)))
+                        VALUES(%s,%s,%s,%s);", (fileName,self.time,str(self.numberOfResponses),str(self.idExperiment)))
         self.conn.commit()
         cursor.close()
 
