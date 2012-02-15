@@ -17,6 +17,7 @@ from objects import Spike,Response
 from scipy.interpolate import Rbf
 from scipy import polyval, polyfit
 from clussterization import clusterization, clusterAnalyser
+from checkResult import resultAnalysis
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -106,7 +107,11 @@ class dataSample:
             except:
                 print "writeData() error:", sys.exc_info()
                 self.errorState=1
-
+        try:
+            resultAnalysis(self)
+        except:
+            print "resultAnalysis error:", sys.exc_info()
+            self.errorState=1
 
     def argReading(self):
         self.wavelet='sym7'#'bior3.5
@@ -232,6 +237,7 @@ class dataSample:
                 else:
                     realStop=tmpStop
                     print("can`t find stimulum end =(")
+                    self.errorState=1
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
                 realStop=tmpStop
@@ -365,7 +371,7 @@ class dataSample:
                         if self.debug==1:
                             print((i,k,k+smallFrame*2,self.stimuli[0][i]))
                 except:
-                    print "finding end of last response:", sys.exc_info()
+                    #print "finding end of last response:", sys.exc_info()
                     k=lastMax+smallFrame
                     std2=self.result[start-smallFrame*2:start].std()
                     while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/6 or self.result[k:k+smallFrame*2].std()>std2/6) and k<length-smallFrame*2):
@@ -477,6 +483,7 @@ class dataSample:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
+                self.errorState=1
         print(self.responseDict)
         
 
@@ -529,8 +536,8 @@ class dataSample:
                 for j in tmpObject.spikes:
                     tmpObject2=getattr(self,j)
                     self.mysql_writer.dbWriteSpike(tmpObject2)
-                    del tmpObject2
-                del tmpObject
+                #    del tmpObject2
+                #del tmpObject
             
             
             
