@@ -11,7 +11,7 @@ import sys,MySQLdb,pickle
 
 class Mysql_writer:
     
-    def __init__(self,filePath,substance):
+    def __init__(self,filePath,tagString):
         self.filePath=filePath
         self.variables_global()
         self.dbConnect()
