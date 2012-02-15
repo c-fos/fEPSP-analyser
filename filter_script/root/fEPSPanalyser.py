@@ -88,7 +88,6 @@ class fepspAnalyser:
                 mysql_writer.dbDisconnect()
             except:
                 print "Unexpected error in dbDisconect:", sys.exc_info()
-                #raise
         
 if __name__ == "__main__":
     analyserObject=fepspAnalyser(sys.argv)

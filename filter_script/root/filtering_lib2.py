@@ -14,9 +14,9 @@ from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
-from hcluster import fclusterdata
-from scipy.interpolate import spline, Rbf
+from scipy.interpolate import Rbf
 from scipy import polyval, polyfit
+from clussterization import clusterization, clusterAnalyser
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -32,97 +32,80 @@ class dataSample:
     
     def dataProcessing(self):       
         try:
-            self.argReading()#0
+            self.argReading()
         except:
             print "argReading() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         if self.debug==1:
             print(self.fileName)
-        ##
         try:
             self.dataLoading()
         except:
             print "dataLoading() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
             self.tresholdCreating() 
         except:
             print "tresholdCreating() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
             self.cleanData=self.cutStimuli(self.data)
         except:
             print "cutStimuli() error:", sys.exc_info()
             self.errorState=1
-            ##raise 
         try: 
             self.snr=self.snrFinding(self.cleanData,self.defaultFrame)
         except:
             print "snrFinding() error:", sys.exc_info()
             self.errorState=1
-            ##raise 
         try:
             self.mainLevelFinding()
         except:
             print "mainLevelFinding() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
             self.filtering()
         except:
             print "filtering() error:", sys.exc_info()
             self.errorState=1
-            ##raise
-            
         try:
             self.spikeFinding()
         except:
             print "spikeFinding() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
-            self.clusters=self.clusterization()
+            self.clusters=clusterization(self,self.spikeDict,self.stimuli,self.debug,self.isClusterOn)
+            #clusterization(fromObject,spikeDict,stimuli,debug,isClusterOn)
         except:
             print "clusterization() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
-            self.clusterAnalyser()
+            clusterAnalyser(self,self.spikeDict,self.clusters)
+            #clusterAnalyser(fromObject,spikeDict,clusters)
         except:
             print "clusterAnalyser() error:", sys.exc_info()
             self.errorState=1
-            ##raise   
         try:
             self.responsMatrix=self.responsLength()
         except:
             print "responsLength() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
             self.responsAnalysis()
         except:
             print "responsAnalysis() error:", sys.exc_info()
             self.errorState=1
-            ##raise
         try:
             self.plotData()
         except:
             print "plotData() error:", sys.exc_info()
             self.errorState=1
-            ###raise
         if self.mysql_writer!="pass":
             try:
                 self.writeData()
             except:
                 print "writeData() error:", sys.exc_info()
                 self.errorState=1
-                ###raise
-        
-        
-    #0-reading command line arguments
 
 
     def argReading(self):
@@ -133,8 +116,6 @@ class dataSample:
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
-                      
-    #1-data Loading
 
     def dataLoading(self):
         if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
@@ -143,20 +124,24 @@ class dataSample:
         else:
             self.data=fromfile(self.fileName,int16)
             self.data=self.dataFitting(self.data,self.frequency)
-    
-    #1.1-data fitting
-
 
     def dataFitting(self,data,frequency):
         tmp=2**(math.ceil(math.log(len(data),2)))
-        delay=2*frequency/1000#asume that first 2 msec doesn`t contain any signal 
+        #asume that first 10 points is flat
+        delay=2*frequency/1000#asume that first 2 msec doesn`t contain any signal
+        meanTmp = data[:10].mean()
+        stdTmp = data[:10].std()
+        stop=where(abs(data[10:delay]-meanTmp)<stdTmp)[0]
+        if len(stop)>0:
+            delay=stop[0]+10 
+        else:
+            pass 
         newData=zeros(tmp, dtype='float32')
         deltaLen=tmp-len(data)
         for j in range(int(math.ceil(deltaLen/delay))):
             for k in range(delay):
                 newData[delay*j+k]=data[k]
-        for i in range(len(data)):
-            newData[deltaLen+i]=data[i]
+        newData[deltaLen:]=data
         return newData
 
 
@@ -226,26 +211,27 @@ class dataSample:
         dpwr=dpwr[dpwrMask]            
         stimList=[[],[]]
         for i in range(len(dpwr)):
-            start=dpwr[i]
-            length=self.stimulyDuration/10
+            start=dpwr[i]-10
+            length=self.stimulyDuration/4
             baseline=data[start-30:start].mean()
             baseStd=data[start-30:start].std()
             tmpStop=start+length
             if tmpStop+self.defaultFrame+5>len(data):
                 tmpStop=len(data)-self.defaultFrame-5
-            stimMean=data[start:tmpStop].mean()
+            stimMean=data[start+10:tmpStop].mean()
             if self.debug==1:
                 print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
             sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],10)
-            firstArray=abs(diff(sample))<=baseStd
-            secondArray=abs(sample[1:]-baseline)<baseStd
-            thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/10
+            firstArray=abs(diff(sample))<=0.1
+            secondArray=abs(sample[1:]-baseline)<baseStd/2
+            thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
             try:
                 shift=where((firstArray+secondArray)*thirdArray==True)[0]
                 if len(shift)>0:
-                    realStop=tmpStop+where((firstArray+secondArray)*thirdArray==True)[0][0]
+                    realStop=tmpStop+shift[0]
                 else:
                     realStop=tmpStop
+                    print("can`t find stimulum end =(")
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
                 realStop=tmpStop
@@ -260,13 +246,12 @@ class dataSample:
             self.findStimuli(data)
         except:
             print "Unexpected error in findStimuli", sys.exc_info()
-            ###raise
         if len(self.stimuli[0])!=0:
             if self.debug==1:
                 print("cut stimuli")
             for i in range(len(self.stimuli[0])):
-                pathValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
-                data[self.stimuli[0][i]:self.stimuli[1][i]]=pathValue    
+                patchValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
+                data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue    
             return data
         else:
             return data
@@ -338,60 +323,11 @@ class dataSample:
         if self.debug==1:
             print((self.fileName,self.spikeDict))
      
-        
-    def clusterization(self):
-        if len(self.spikeDict)>1:
-            dictValues=array(self.spikeDict.values())
-            listOfSpikes=[]
-            for i in dictValues:
-                tmpObject=getattr(self,i)
-                listOfSpikes.append([tmpObject.spikeMin])
-            ndarrayOfSpikes=array(listOfSpikes)
-            rightClasterOrder=zeros(ndarrayOfSpikes.size,dtype=int)
-            if self.isClusterOn==1:
-                if self.debug==1:
-                    print("clusterization is on")
-                try:
-                    clusteredSpikes=fclusterdata(ndarrayOfSpikes,1.1,depth=4,method='average')
-                except:
-                    print "Unexpected error in fclusterdata:", sys.exc_info()
-                    ###raise           
-                clusterNumbers=unique(clusteredSpikes)
-                for i in clusterNumbers:
-                    k=where(rightClasterOrder==0)[0][0]
-                    mask=clusteredSpikes==clusteredSpikes[k]
-                    rightClasterOrder+=mask*i
-                if self.debug==1:
-                    print((clusteredSpikes,rightClasterOrder))
-                return(rightClasterOrder)
-            else:
-                if self.debug==1:
-                    print("clusterization is off")
-                ndarrayOfSpikes.shape=(1,ndarrayOfSpikes.size)
-                for i in range(len(self.stimuli[0])):
-                    rightClasterOrder[ndarrayOfSpikes[0]>=self.stimuli[0][i]]=i+1
-                return (rightClasterOrder)
-        else:
-            return(array([1]))
-        
-
-    def clusterAnalyser(self):
-        dictValues=array(self.spikeDict.values())
-        clusters=self.clusters
-        for i in range(len(dictValues)):
-            try:
-                tmpObject=getattr(self,dictValues[i])
-                tmpObject.responsNumber=int(clusters[i])
-                k=where(clusters==int(clusters[i]))[0][0]
-                tmpObject.spikeNumber=int(i)-k
-            except:
-                print "Unexpected error in cluster analisys:", sys.exc_info()
-                ###raise
             
     def responsLength(self):
         responsMatrix=zeros((max(self.clusters),2),dtype=int)#[[start1,stop1],[start2,stop2]]
         length=len(self.result)
-        smallFrame=self.defaultFrame/5
+        smallFrame=self.defaultFrame/10
         if self.debug==1:
             print(len(unique(self.clusters)),len(self.clusters))
         for i in unique(self.clusters):
@@ -421,17 +357,18 @@ class dataSample:
                 baseLevel=self.result[start-smallFrame*2:start].mean()
                 tmpObject=getattr(self,lastSpike)
                 lastMax=tmpObject.spikeMax2
-                k=lastMax
+                k=lastMax+smallFrame
                 std2=self.result[start-smallFrame*2:start].std()
                 try: 
-                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
+                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/4 or self.result[k:k+smallFrame*2].std()>std2/4) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
                         k+=smallFrame
                         if self.debug==1:
                             print((i,k,k+smallFrame*2,self.stimuli[0][i]))
                 except:
-                    k=lastMax
+                    print "finding end of last response:", sys.exc_info()
+                    k=lastMax+smallFrame
                     std2=self.result[start-smallFrame*2:start].std()
-                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/2 or self.result[k:k+smallFrame*2].std()>std2/2) and k<length-smallFrame*4):
+                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/6 or self.result[k:k+smallFrame*2].std()>std2/6) and k<length-smallFrame*2):
                         k+=smallFrame
                         
                 stop=k
@@ -444,19 +381,17 @@ class dataSample:
                         if len(shift)>0:
                             realStop=lastMax+shift[0]
                         else:
-                            realStop=lastMax
+                            realStop=stop
                         responsMatrix[i-1]=start,realStop
                     else:
                         responsMatrix[i-1]=start,stop
                 except:
                     responsMatrix[i-1]=start,stop
                     print "Unexpected error in response length finding:", sys.exc_info()
-                    ###raise
         return responsMatrix
     
     def epspReconstructor(self,tmpObject):
         tmpObject2=getattr(self,tmpObject.spikes[-1])
-        #before lastMax of lastSpike
         sample1=self.result[tmpObject.responseStart:tmpObject2.spikeMax2]     
         mask=zeros(tmpObject.responseEnd-tmpObject.responseStart,dtype='bool')
         tmpObject2=getattr(self,tmpObject.spikes[0])
@@ -470,11 +405,8 @@ class dataSample:
                 mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
             except:
                 print "there is no second spike?:", sys.exc_info()
-                ###raise
-        #after lastMax of lastSpike (curve reconstruction)
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
-        #mask2=zeros(len(sample2),dtype='bool')
         sample2Points=array(range(len(sample2)))
         ar1=Rbf(sample2Points[sample2Points%200==0],sample2[sample2Points%200==0],smooth=0.01)#,function='gaussian')
         xr1=ar1(sample2Points)
@@ -482,8 +414,6 @@ class dataSample:
         for i in range(8):
             mask[tmpObject2.spikeMax2-tmpObject.responseStart+step*i]=1
         mask[-1]=1
-        #append
-        #mask=append(mask1,mask2)
         sample=append(sample1,xr1)
         if self.debug==1:
             print((len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd]),"len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd])"))
@@ -491,7 +421,6 @@ class dataSample:
         values=sample[mask]
         sample3=array(range(len(sample)))
         try:           
-            #sp2 = Rbf(timePoints,int16(values),smooth=0.0001)
             sp3 = Rbf(timePoints,int16(values),smooth=1,function='thin_plate')
             y4=sp3(sample3)
             try:
@@ -502,14 +431,11 @@ class dataSample:
                 return front,back
             except:
                 print "Unexpected error in epspAnaliser:", sys.exc_info()
-                ###raise
-                return 0,0            
+                return 0,0      
         except:
             print "Unexpected error in reconstruction:", sys.exc_info()
-            ###raise
             return 0,0
         
-    
     def epspAnaliser(self,y):
         maxvalue=max(y)
         maxPoint=where(y==maxvalue)[0]
@@ -529,8 +455,6 @@ class dataSample:
         back=(fourthValue-thirdValue)/(fourthPoint-thirdPoint)
         return float32(front), float32(back[0])
                         
- 
-    
     def responsAnalysis(self):
         rMatrix=self.responsMatrix
         self.epsp=array([[],[]])
@@ -547,12 +471,12 @@ class dataSample:
             tmpObject.responsNumber=i
             tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
+            tmpObject.epspFront=0
+            tmpObject.epspBack=0
             try:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
-                
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
-                ###raise
         print(self.responseDict)
         
 
@@ -560,36 +484,41 @@ class dataSample:
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot(self.data,'y')
-        ax.plot(self.result,'b')
-        ax.plot(self.epsp[0],self.epsp[1],'r')
-        ax.grid(color='k', linestyle='-', linewidth=0.4)
         try:
-            for i in self.responseDict.values():
-                tmpObject=getattr(self,i)
-                rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd-tmpObject.responseStart, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.3)
-                ax.add_patch(rect)
-                ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
-                try:
-                    for j in tmpObject.spikes:
-                        tmpObject2=getattr(self,j)
-                        tex = str((tmpObject2.responsNumber,tmpObject2.spikeNumber,tmpObject2.spikeAmpl))
-                        ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
-                        ax.plot(tmpObject2.spikeMax1,self.result[tmpObject2.spikeMax1],'og')
-                        ax.plot(tmpObject2.spikeMax2,self.result[tmpObject2.spikeMax2],'og')
-                        ax.vlines(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin], self.result[tmpObject2.spikeMin]+tmpObject2.spikeAmpl, color='k', linestyles='dashed')
-                        ax.text(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin]-15, tex, fontsize=12, va='bottom')
-                except:
-                    print "Unexpected error wile spike ploating:", sys.exc_info()
-                    ###raise
+            ax.plot(self.result,'b')
+            ax.plot(self.epsp[0],self.epsp[1],'r')
+            ax.grid(color='k', linestyle='-', linewidth=0.4)
+            try:
+                for i in self.responseDict.values():
+                    tmpObject=getattr(self,i)
+                    rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd-tmpObject.responseStart, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.3)
+                    ax.add_patch(rect)
+                    ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
+                    try:
+                        for j in tmpObject.spikes:
+                            tmpObject2=getattr(self,j)
+                            tex = str((tmpObject2.responsNumber,tmpObject2.spikeNumber,tmpObject2.spikeAmpl))
+                            ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
+                            ax.plot(tmpObject2.spikeMax1,self.result[tmpObject2.spikeMax1],'og')
+                            ax.plot(tmpObject2.spikeMax2,self.result[tmpObject2.spikeMax2],'og')
+                            ax.vlines(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin], self.result[tmpObject2.spikeMin]+tmpObject2.spikeAmpl, color='k', linestyles='dashed')
+                            ax.text(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin]-15, tex, fontsize=12, va='bottom')
+                    except:
+                        print "Unexpected error wile spike ploating:", sys.exc_info()
+            except:
+                print "Unexpected error wile ploating:", sys.exc_info()
+                self.errorState=1
+            for i in range(len(self.stimuli[0])):
+                ax.axvline(x=self.stimuli[0][i],color='g')
         except:
-            print "Unexpected error wile ploating:", sys.exc_info()
-            self.errorState=1
-            ##raise
-        for i in range(len(self.stimuli[0])):
-            ax.axvline(x=self.stimuli[0][i],color='g')
-        plt.savefig(self.fileName+"_graph.png")
-        #plt.show()
-        plt.close()# very important to stop memory leak
+            print "Unexpected error wile ploating computedData:", sys.exc_info()
+            self.errorState=1 
+        if self.debug==1:
+            plt.show()
+        else:
+            plt.savefig(self.fileName+"_graph.png")
+            #plt.show()
+            plt.close()# very important to stop memory leak
         del fig
         
     def writeData(self):
@@ -600,8 +529,8 @@ class dataSample:
                 for j in tmpObject.spikes:
                     tmpObject2=getattr(self,j)
                     self.mysql_writer.dbWriteSpike(tmpObject2)
-                    #del tmpObject2
-            #del tmpObject
+                    del tmpObject2
+                del tmpObject
             
             
             
