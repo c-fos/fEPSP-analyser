@@ -45,7 +45,7 @@ class fepspAnalyser:
         print(arguments)
         dirPath = str(arguments[1])
         fileList=glob(dirPath+"/*.dat")
-        print(fileList)
+        #print(fileList)
         if int(arguments[7]):
             mysql_writer=Mysql_writer(fileList[0],arguments[5])
             print("write to database enabled")    

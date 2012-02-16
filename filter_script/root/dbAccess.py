@@ -16,7 +16,6 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.numberOfResponses=1#must be refactored!
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
@@ -95,9 +94,9 @@ class Mysql_writer:
     def dbWriteRecord(self):
         fileName="%s/%s" % (self.filePath.split('/')[-2],self.filePath.split('/')[-1])
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO record(filename,time,numberofresponses,\
+        cursor.execute("INSERT INTO record(filename,time,\
                                             experiment_idexperiment)\
-                        VALUES(%s,%s,%s,%s);", (fileName,self.time,str(self.numberOfResponses),str(self.idExperiment)))
+                        VALUES(%s,%s,%s);", (fileName,self.time,str(self.idExperiment)))
         self.conn.commit()
         cursor.close()
 
