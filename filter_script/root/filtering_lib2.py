@@ -55,7 +55,7 @@ class dataSample:
             print "cutStimuli() error:", sys.exc_info()
             self.errorState=1
         try: 
-            self.snr=self.snrFinding(self.cleanData,self.defaultFrame)
+            self.snr=self.snrFinding(self.cleanData[self.deltaLen:],self.defaultFrame)
         except:
             print "snrFinding() error:", sys.exc_info()
             self.errorState=1
@@ -142,11 +142,11 @@ class dataSample:
         else:
             pass 
         newData=zeros(tmp, dtype='float32')
-        deltaLen=tmp-len(data)
-        for j in range(int(math.ceil(deltaLen/delay))):
+        self.deltaLen=tmp-len(data)
+        for j in range(int(math.ceil(self.deltaLen/delay))):
             for k in range(delay):
                 newData[delay*j+k]=data[k]
-        newData[deltaLen:]=data
+        newData[self.deltaLen:]=data
         return newData
 
 
@@ -256,8 +256,12 @@ class dataSample:
             if self.debug==1:
                 print("cut stimuli")
             for i in range(len(self.stimuli[0])):
-                patchValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
-                data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue    
+                try:
+                    patchValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
+                    data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue
+                except:
+                    self.errorState=1
+                    return data    
             return data
         else:
             return data
@@ -272,6 +276,7 @@ class dataSample:
     
 
     def filtering(self):
+        
         self.coeffs=pywt.swt(self.cleanData, self.wavelet, level=self.mainLevel+1)
         for i in range(len(self.coeffs)):
             cA, cD = self.coeffs[i]
@@ -280,7 +285,7 @@ class dataSample:
                 if self.debug==1:
                     print(("noisLevel",i))
             else:
-                minSD=self.stdFinder(cD,self.defaultFrame)
+                minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
                 cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**4))
             self.coeffs[i]=cA, cD
         self.result=iswt(self.coeffs,self.wavelet)
@@ -292,8 +297,8 @@ class dataSample:
         stop=-self.defaultFrame
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
-        std=self.stdFinder(self.cleanData,self.defaultFrame)
-        SD=std*2*(self.coeffTreshold-5*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
+        std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
+        SD=std*2*(self.coeffTreshold-5.0*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
         spikePoints=[]
         if minimum[0]<maximum[0]:
             minimum=minimum[1:]
@@ -363,31 +368,56 @@ class dataSample:
                 baseLevel=self.result[start-smallFrame*2:start].mean()
                 tmpObject=getattr(self,lastSpike)
                 lastMax=tmpObject.spikeMax2
-                k=lastMax+smallFrame
+                k=lastMax
                 std2=self.result[start-smallFrame*2:start].std()
                 try: 
-                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/4 or self.result[k:k+smallFrame*2].std()>std2/4) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
+                    while((abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/4 or self.result[k:k+smallFrame*4].std()>std2/4) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
                         k+=smallFrame
                         if self.debug==1:
                             print((i,k,k+smallFrame*2,self.stimuli[0][i]))
                 except:
-                    #print "finding end of last response:", sys.exc_info()
-                    k=lastMax+smallFrame
-                    std2=self.result[start-smallFrame*2:start].std()
-                    while((abs(self.result[k:k+smallFrame*2].mean()-baseLevel)>std2/6 or self.result[k:k+smallFrame*2].std()>std2/6) and k<length-smallFrame*2):
-                        k+=smallFrame
+                    if self.debug==1:
+                        print "finding end of last response:", sys.exc_info()
+                    k=lastMax
+                    if k>length-smallFrame*4:
+                        k=length-smallFrame
+                    else:
+                        while(abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/6 or self.result[k:k+smallFrame*4].std()>std2/6):
+                            k+=smallFrame
+                            if k>length-smallFrame*5:
+                                k=length-smallFrame
+                                break
                         
                 stop=k
+                if self.debug==1:
+                    print((lastMax,stop,length,"lastMax,stop,length"))
                 try:
                     sampleLen=stop-lastMax
+                    if self.debug==1:
+                        print(("respons end sample length:",sampleLen))
                     if sampleLen>0:
                         ar=polyfit(array(range(sampleLen)),self.result[lastMax:stop],2)
                         sample=polyval(ar,array(range(sampleLen)))
-                        shift=where(diff(sample)>=-0.001)[0]
-                        if len(shift)>0:
-                            realStop=lastMax+shift[0]
+                        extrem=where(diff(sample)==0)[0]
+                        if self.debug==1:
+                            print(("number of extremums in respons length curve:", len(extrem)))
+                        if len(extrem)>0:
+                            lastExtremum=extrem[-1]
+                            if sample[lastExtremum]>sample[lastExtremum+1]:
+                                realStop=stop
+                            else:
+                                realStop=lastExtremum
                         else:
-                            realStop=stop
+                            if sample[0]>sample[1]:
+                                shift=where(diff(sample)>-0.000001)[0]
+                                if self.debug==1:
+                                    print(("shift:", shift))
+                                if len(shift)>0:
+                                    realStop=lastMax+shift[0]
+                                else:
+                                    realStop=stop
+                            else:
+                                realStop=stop
                         responsMatrix[i-1]=start,realStop
                     else:
                         responsMatrix[i-1]=start,stop
