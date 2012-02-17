@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, append, math, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, append, math, empty, histogram, ones,ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -55,7 +55,7 @@ class dataSample:
             print "cutStimuli() error:", sys.exc_info()
             self.errorState=1
         try: 
-            self.snr=self.snrFinding(self.cleanData[self.deltaLen:],self.defaultFrame)
+            self.snr=self.snrFinding(self.cleanData[self.deltaLen+self.stimulyDuration:],self.defaultFrame)
         except:
             print "snrFinding() error:", sys.exc_info()
             self.errorState=1
@@ -124,31 +124,30 @@ class dataSample:
 
     def dataLoading(self):
         if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
-            self.data = loadtxt(self.fileName,dtype='float32')
-            self.data = self.dataFitting(self.data,self.frequency)
+            data = loadtxt(self.fileName,dtype='float32')
+            self.data = self.dataFitting(data,self.frequency)
         else:
-            self.data=fromfile(self.fileName,int16)
-            self.data=self.dataFitting(self.data,self.frequency)
-
+            data=fromfile(self.fileName,int16)
+            self.data=self.dataFitting(data,self.frequency)
+            
+    def histMean(self,sample):
+        unique1=unique(sample)
+        if len(unique1)>1:
+            dataHist=histogram(sample,bins=unique1)
+            histMax=dataHist[0].max()
+            meanTmp = dataHist[1][where(dataHist[0]==histMax)[0]]
+            return meanTmp[0]
+        else:
+            return unique1
+    
     def dataFitting(self,data,frequency):
         tmp=2**(math.ceil(math.log(len(data),2)))
-        #asume that first 10 points is flat
-        delay=2*frequency/1000#asume that first 2 msec doesn`t contain any signal
-        meanTmp = data[:10].mean()
-        stdTmp = data[:10].std()
-        stop=where(abs(data[10:delay]-meanTmp)<stdTmp)[0]
-        if len(stop)>0:
-            delay=stop[0]+10 
-        else:
-            pass 
-        newData=zeros(tmp, dtype='float32')
         self.deltaLen=tmp-len(data)
-        for j in range(int(math.ceil(self.deltaLen/delay))):
-            for k in range(delay):
-                newData[delay*j+k]=data[k]
+        meanTmp=self.histMean(data)
+        newData=empty(tmp, dtype='float32')
+        newData.fill(meanTmp)
         newData[self.deltaLen:]=data
         return newData
-
 
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
@@ -165,6 +164,8 @@ class dataSample:
         minSD=data[:frameSize].std()
         maxSD=max(data)-min(data)
         snr=float16(maxSD/minSD)
+        if self.debug==1:
+            print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
         return snr
 
 
@@ -204,8 +205,8 @@ class dataSample:
 
     def findStimuli(self,data):
         pwr=pywt.swt(data, 'haar', 2)
-        pwr2=array(pwr[0][1])
-        treshold=max(abs(pwr2))/4
+        pwr2=abs(array(pwr[0][1]))
+        treshold=max(pwr2)/4
         pwr2[pwr2<treshold]=0
         pwr2[pwr2>0]=treshold 
         dpwr=where((diff(pwr2)>treshold/2)==True)[0]
@@ -213,12 +214,14 @@ class dataSample:
         for i in range(len(dpwr)-1):
             if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
                 dpwrMask[i+1]=0
-        dpwr=dpwr[dpwrMask]            
+        dpwr=dpwr[dpwrMask]
+        if self.debug==1:
+                print("number of finded stimuls - %s" % len(dpwr))          
         stimList=[[],[]]
         for i in range(len(dpwr)):
             start=dpwr[i]-10
             length=self.stimulyDuration/4
-            baseline=data[start-30:start].mean()
+            baseline=self.histMean(data[start-30:start])
             baseStd=data[start-30:start].std()
             tmpStop=start+length
             if tmpStop+self.defaultFrame+5>len(data):
@@ -293,12 +296,14 @@ class dataSample:
 
     def spikeFinding(self):
         resultData=self.result
-        start=self.defaultFrame
-        stop=-self.defaultFrame
+        start=self.defaultFrame/4
+        stop=-self.defaultFrame/4
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=std*2*(self.coeffTreshold-5.0*self.coeffTreshold/self.snr)#? maybe we must add the snr check?
+        SD=float16(std*2*(self.coeffTreshold-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
+        if self.debug==1:
+            print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
         if minimum[0]<maximum[0]:
             minimum=minimum[1:]

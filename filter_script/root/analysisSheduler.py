@@ -32,7 +32,8 @@ elif sys.argv[1]=="start" and len(sys.argv)==2:
         print tags,path
         try:
             analyserObject=fepspAnalyser([0,path,'200000',"data","1",tags,0,1,0])
+            del analyserObject
         except:
             print "fepspAnalyser error:", sys.exc_info()
-        
+            del analyserObject
 
