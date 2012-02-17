@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, append, math, empty, histogram, ones,ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, asmatrix, append, math, empty, sqrt, histogram, ones,ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -271,18 +271,17 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        if self.debug==1:
-            print(self.snr)
         self.mainLevel=int((math.log((self.baseFrequency-4*(self.baseFrequency/self.snr))/self.frequency,0.5))-2)#
         if self.debug==1:
-            print(self.mainLevel)
+            print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
 
-    def filtering(self):
-        
+    def filtering(self):        
         self.coeffs=pywt.swt(self.cleanData, self.wavelet, level=self.mainLevel+1)
+        self.coefsBeforeF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         for i in range(len(self.coeffs)):
             cA, cD = self.coeffs[i]
+            cDbk = cD
             if i>=(len(self.coeffs)-self.highNoiseLevel):
                 cD=zeros(len(cA),dtype='float32')
                 if self.debug==1:
@@ -291,6 +290,7 @@ class dataSample:
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
                 cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**4))
             self.coeffs[i]=cA, cD
+        self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         self.result=iswt(self.coeffs,self.wavelet)
    
 
@@ -345,7 +345,7 @@ class dataSample:
         length=len(self.result)
         smallFrame=self.defaultFrame/10
         if self.debug==1:
-            print(len(unique(self.clusters)),len(self.clusters))
+            print(len(unique(self.clusters)),len(self.clusters),"len(unique(self.clusters)),len(self.clusters)")
         for i in unique(self.clusters):
             firstSpike=self.spikeDict.values()[list(self.clusters).index(i)]
             try:
@@ -378,8 +378,6 @@ class dataSample:
                 try: 
                     while((abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/4 or self.result[k:k+smallFrame*4].std()>std2/4) and (k<length-smallFrame*4 and k<self.stimuli[0][i])):
                         k+=smallFrame
-                        if self.debug==1:
-                            print((i,k,k+smallFrame*2,self.stimuli[0][i]))
                 except:
                     if self.debug==1:
                         print "finding end of last response:", sys.exc_info()
@@ -523,8 +521,10 @@ class dataSample:
         
 
     def plotData(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111)
+        fig, axes_list = plt.subplots(3, 1, sharex=True)
+        ax = axes_list[0]
         ax.plot(self.data,'y')
         try:
             ax.plot(self.result,'b')
@@ -555,7 +555,19 @@ class dataSample:
         except:
             print "Unexpected error wile ploating computedData:", sys.exc_info()
             self.errorState=1 
-        if self.debug==1:
+        if self.debug==1:   
+            #    ax.locator_params(nbins=3)
+            bx = axes_list[1]
+            bx.set(xlabel="x-label", ylabel="y-label", title="before filtering")
+            #print self.coefsBeforeF.shape
+            normMatrixBefore=self.coefsBeforeF[:3]/sqrt(self.coefsBeforeF[:3].var())
+            bx.imshow(normMatrixBefore, aspect='auto')
+            #print(self.coefsBeforeF.size())
+            cx = axes_list[2]
+            cx.set(xlabel="x-label", ylabel="y-label", title="after filtering")
+            normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
+            cx.imshow(normMatrixAfter, aspect='auto')
+            plt.tight_layout()
             plt.show()
         else:
             plt.savefig(self.fileName+"_graph.png")
