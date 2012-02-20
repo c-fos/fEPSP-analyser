@@ -105,14 +105,22 @@ class dataSample:
         if self.mysql_writer!="pass":
             try:
                 self.writeData()
+                
             except:
                 print "writeData() error:", sys.exc_info()
                 self.errorState=1
+            if self.errorState!=0 or self.softError!=0:
+                try:
+                    self.mysql_writer.dbWriteError(self.softError,self.errorState)
+                except:
+                    print "dbWriteError error:", sys.exc_info()
+                    self.errorState=1
         try:
             resultAnalysis(self)
         except:
             print "resultAnalysis error:", sys.exc_info()
-            self.errorState=1
+            self.errorState=1        
+
 
     def argReading(self):
         self.wavelet='sym5'#'bior3.5
@@ -207,7 +215,7 @@ class dataSample:
     def findStimuli(self,data):
         pwr=pywt.swt(data, 'haar', 2)
         pwr2=abs(array(pwr[0][1]))
-        treshold=max(pwr2)/3
+        treshold=max(pwr2)/2
         pwr2[pwr2<treshold]=0
         pwr2[pwr2>0]=treshold 
         dpwr=where((diff(pwr2)>treshold/2)==True)[0]
@@ -241,7 +249,7 @@ class dataSample:
                 else:
                     realStop=tmpStop
                     print("can`t find stimulum end =(")
-                    self.errorState=1
+                    self.softError=1
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
                 realStop=tmpStop
@@ -387,12 +395,12 @@ class dataSample:
                         print "finding end of last response:", sys.exc_info()
                     k=lastMax
                     if k>length-smallFrame*4:
-                        k=length-smallFrame
+                        k=length-1
                     else:
                         while(abs(self.result[k:k+smallFrame*4].mean()-baseLevel)>std2/6 or self.result[k:k+smallFrame*4].std()>std2/6):
                             k+=smallFrame
                             if k>length-smallFrame*5:
-                                k=length-smallFrame
+                                k=length-1
                                 break
                         
                 stop=k
@@ -439,6 +447,7 @@ class dataSample:
         mask[0]=1
         mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
         mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+        mask[(tmpObject2.spikeMax1-tmpObject.responseStart)/2]=1
         if len(tmpObject.spikes)>=2:
             try:
                 tmpObject2=getattr(self,tmpObject.spikes[1])
@@ -449,7 +458,10 @@ class dataSample:
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
         sample2Points=array(range(len(sample2)))
-        ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
+        if len(sample2Points)>301:
+            ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
+        else:
+            ar1=Rbf(sample2Points[sample2Points%10==0],sample2[sample2Points%10==0],smooth=0.01)
         xr1=ar1(sample2Points)
         step=len(sample2Points)/8
         for i in range(8):
@@ -519,7 +531,7 @@ class dataSample:
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
                 self.errorState=1
-        print(self.responseDict)
+        print(self.fileName.split('/')[-1],self.responseDict)
         
 
     def plotData(self):

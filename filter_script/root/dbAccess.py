@@ -98,7 +98,7 @@ class Mysql_writer:
                                             experiment_idexperiment)\
                         VALUES(%s,%s,%s);", (fileName,self.time,str(self.idExperiment)))
         self.conn.commit()
-        cursor.close()
+        cursor.close() 
 
     def dbWriteResponse(self,tmpObject):
         #print("dbWriteResponse")
@@ -112,12 +112,20 @@ class Mysql_writer:
                              FROM record \
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
-        idRecord = cursor.fetchall()[0][0]
+        self.idRecord = cursor.fetchall()[0][0]
         cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront, epspBack)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(idRecord),str(vpsp),\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
                              str(tmpObject.epspFront),str(tmpObject.epspBack)))
         self.conn.commit()
         cursor.close()
+        
+    def dbWriteError(self,soft,hard):
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE record\
+                        SET softError=%s,hardError=%s\
+                        WHERE record.idrecord=%s;", (str(soft),str(hard),str(self.idRecord)))
+        self.conn.commit()
+        cursor.close()   
 
     def dbWriteSpike(self,tmpObject):
         #print("dbWriteSpike")
