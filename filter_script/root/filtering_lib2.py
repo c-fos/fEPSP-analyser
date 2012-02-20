@@ -30,6 +30,7 @@ class dataSample:
         self.mysql_writer=dbobject
         self.arguments=arguments
         self.errorState=0
+        self.softError=0
     
     def dataProcessing(self):       
         try:
@@ -114,7 +115,7 @@ class dataSample:
             self.errorState=1
 
     def argReading(self):
-        self.wavelet='sym7'#'bior3.5
+        self.wavelet='sym5'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
         self.coeffTreshold = int(self.arguments[4])
@@ -206,7 +207,7 @@ class dataSample:
     def findStimuli(self,data):
         pwr=pywt.swt(data, 'haar', 2)
         pwr2=abs(array(pwr[0][1]))
-        treshold=max(pwr2)/4
+        treshold=max(pwr2)/3
         pwr2[pwr2<treshold]=0
         pwr2[pwr2>0]=treshold 
         dpwr=where((diff(pwr2)>treshold/2)==True)[0]
@@ -260,7 +261,10 @@ class dataSample:
                 print("cut stimuli")
             for i in range(len(self.stimuli[0])):
                 try:
-                    patchValue=data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]].mean()
+                    if self.stimuli[0][i]<self.stimulyDuration:
+                        patchValue=self.histMean(data[:self.stimuli[0][i]+self.stimulyDuration])
+                    else:
+                        patchValue=self.histMean(data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]])
                     data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue
                 except:
                     self.errorState=1
@@ -271,7 +275,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int((math.log((self.baseFrequency-4*(self.baseFrequency/self.snr))/self.frequency,0.5))-2)#
+        self.mainLevel=int((math.log((self.baseFrequency*(1+1/sqrt(self.snr/2)))/self.frequency,0.5))-1)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
@@ -301,7 +305,7 @@ class dataSample:
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=float16(std*2*(self.coeffTreshold-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
+        SD=float16(std+std*sqrt(self.snr/2))#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
@@ -413,8 +417,6 @@ class dataSample:
                         else:
                             if sample[0]>sample[1]:
                                 shift=where(diff(sample)>-0.000001)[0]
-                                if self.debug==1:
-                                    print(("shift:", shift))
                                 if len(shift)>0:
                                     realStop=lastMax+shift[0]
                                 else:
@@ -447,7 +449,7 @@ class dataSample:
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
         sample2Points=array(range(len(sample2)))
-        ar1=Rbf(sample2Points[sample2Points%200==0],sample2[sample2Points%200==0],smooth=0.01)#,function='gaussian')
+        ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
         xr1=ar1(sample2Points)
         step=len(sample2Points)/8
         for i in range(8):
@@ -523,12 +525,18 @@ class dataSample:
     def plotData(self):
         #fig = plt.figure()
         #ax = fig.add_subplot(111)
-        fig, axes_list = plt.subplots(3, 1, sharex=True)
-        ax = axes_list[0]
+        if self.debug==1:
+            fig, axes_list = plt.subplots(3, 1, sharex=True)
+            ax = axes_list[0]
+        else:
+            fig, ax = plt.subplots(1, 1)
         ax.plot(self.data,'y')
         try:
             ax.plot(self.result,'b')
-            ax.plot(self.epsp[0],self.epsp[1],'r')
+            try:
+                ax.plot(self.epsp[0],self.epsp[1],'r')
+            except:
+                self.softError=1
             ax.grid(color='k', linestyle='-', linewidth=0.4)
             try:
                 for i in self.responseDict.values():
