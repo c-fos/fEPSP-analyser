@@ -43,6 +43,18 @@ import shutil
 
 
 class fepspAnalyser:
+    
+    def errorProcessing(self,filename,errorType):
+        try:
+            print "copy file with trouble to separate directory"
+            if errorType=="soft":
+                shutil.copy2(filename,"./softErrors/")
+            else:
+                shutil.copy2(filename,"./hardErrors/")
+        except:
+            print "Unexpected error during copy:", sys.exc_info()
+            raise
+        
     def __init__(self,arguments):
         print(arguments)
         dirPath = str(arguments[1])
@@ -65,13 +77,10 @@ class fepspAnalyser:
                     mysql_writer.dbWriteRecord()
                 dataSample1=dataSample(i,mysql_writer,arguments)
                 dataSample1.dataProcessing()
-                if dataSample1.errorState==1:
-                    try:
-                        print "copy file with trouble to separate directory"
-                        shutil.copy2(i,"./mustChecked/")
-                    except:
-                        print "Unexpected error during copy:", sys.exc_info()
-                        raise
+                if dataSample1.hardError==1:
+                    self.errorProcessing(i, "hard")
+                elif dataSample1.softError==1:
+                    self.errorProcessing(i, "soft")
                 else:
                     try:
                         name=dirPath+"/"+str(creatingTime)+"_"+fileName+".pic"

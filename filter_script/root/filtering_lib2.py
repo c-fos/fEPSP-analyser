@@ -29,7 +29,7 @@ class dataSample:
         self.fileName = str(filename)
         self.mysql_writer=dbobject
         self.arguments=arguments
-        self.errorState=0
+        self.hardError=0
         self.softError=0
     
     def dataProcessing(self):       
@@ -37,89 +37,89 @@ class dataSample:
             self.argReading()
         except:
             print "argReading() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         if self.debug==1:
             print(self.fileName)
         try:
             self.dataLoading()
         except:
             print "dataLoading() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.tresholdCreating() 
         except:
             print "tresholdCreating() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.cleanData=self.cutStimuli(self.data)
         except:
             print "cutStimuli() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try: 
             self.snr=self.snrFinding(self.cleanData[self.deltaLen+self.stimulyDuration:],self.defaultFrame)
         except:
             print "snrFinding() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.mainLevelFinding()
         except:
             print "mainLevelFinding() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.filtering()
         except:
             print "filtering() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.spikeFinding()
         except:
             print "spikeFinding() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.clusters=clusterization(self,self.spikeDict,self.stimuli,self.debug,self.isClusterOn)
             #clusterization(fromObject,spikeDict,stimuli,debug,isClusterOn)
         except:
             print "clusterization() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             clusterAnalyser(self,self.spikeDict,self.clusters)
             #clusterAnalyser(fromObject,spikeDict,clusters)
         except:
             print "clusterAnalyser() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.responsMatrix=self.responsLength()
         except:
             print "responsLength() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.responsAnalysis()
         except:
             print "responsAnalysis() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         try:
             self.plotData()
         except:
             print "plotData() error:", sys.exc_info()
-            self.errorState=1
+            self.hardError=1
         if self.mysql_writer!="pass":
             try:
                 self.writeData()
                 
             except:
                 print "writeData() error:", sys.exc_info()
-                self.errorState=1
-            if self.errorState!=0 or self.softError!=0:
+                self.hardError=1
+            if self.hardError!=0 or self.softError!=0:
                 try:
-                    self.mysql_writer.dbWriteError(self.softError,self.errorState)
+                    self.mysql_writer.dbWriteError(self.softError,self.hardError)
                 except:
                     print "dbWriteError error:", sys.exc_info()
-                    self.errorState=1
+                    self.hardError=1
         try:
             resultAnalysis(self)
         except:
             print "resultAnalysis error:", sys.exc_info()
-            self.errorState=1        
+            self.hardError=1        
 
 
     def argReading(self):
@@ -275,7 +275,7 @@ class dataSample:
                         patchValue=self.histMean(data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]])
                     data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue
                 except:
-                    self.errorState=1
+                    self.hardError=1
                     return data    
             return data
         else:
@@ -530,7 +530,7 @@ class dataSample:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
-                self.errorState=1
+                self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
         
 
@@ -569,12 +569,12 @@ class dataSample:
                         print "Unexpected error wile spike ploating:", sys.exc_info()
             except:
                 print "Unexpected error wile ploating:", sys.exc_info()
-                self.errorState=1
+                self.hardError=1
             for i in range(len(self.stimuli[0])):
                 ax.axvline(x=self.stimuli[0][i],color='g')
         except:
             print "Unexpected error wile ploating computedData:", sys.exc_info()
-            self.errorState=1 
+            self.hardError=1 
         if self.debug==1:   
             #    ax.locator_params(nbins=3)
             bx = axes_list[1]
