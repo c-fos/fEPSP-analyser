@@ -163,21 +163,11 @@ class dataSample:
         self.defaultFrame=5*msec #frame size for mean() and std() finding must depend on frequency. assume it equeal to 5msec
         self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
-        self.baseFrequency=150 #we must separate the levels of wavelet decomposition wich contains most part of the signal
+        self.baseFrequency=300 #we must separate the levels of wavelet decomposition wich contains most part of the signal
         highNoiseFrequency=14000.0
         self.highNoiseLevel=int((math.log(highNoiseFrequency/self.frequency,0.5)))
         self.localDelay=1*msec #time delay before spike(filtering of local responses)
         
-
-    def snrFinding(self,data,frameSize):
-        minSD=data[:frameSize].std()
-        maxSD=max(data)-min(data)
-        snr=float16(maxSD/minSD)
-        if self.debug==1:
-            print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
-        return snr
-
-
     def stdFinder(self,data,frameSize,mean=False,maxStd=False):
         dataSample=[]
         minSD=200
@@ -209,7 +199,18 @@ class dataSample:
             if mean==True:
                 return data.std(),data.mean()
             else:
-                return data.std()        
+                return data.std()  
+            
+    def snrFinding(self,data,frameSize):
+        minSD=self.stdFinder(data,frameSize)
+        maxSD=ptp(data)
+        snr=float16(maxSD/minSD)
+        if self.debug==1:
+            print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
+        return snr
+
+
+      
 
 
     def findStimuli(self,data):
@@ -283,7 +284,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int((math.log((self.baseFrequency*(1+1/sqrt(self.snr/2)))/self.frequency,0.5))-1)#
+        self.mainLevel=int((math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5))-1)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
