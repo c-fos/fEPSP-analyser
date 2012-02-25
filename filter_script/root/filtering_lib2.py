@@ -266,6 +266,8 @@ class dataSample:
         except:
             print "Unexpected error in findStimuli", sys.exc_info()
         if len(self.stimuli[0])!=0:
+            processedData=zeros(len(data),dtype='int')
+            processedData+=data
             if self.debug==1:
                 print("cut stimuli")
             for i in range(len(self.stimuli[0])):
@@ -274,11 +276,10 @@ class dataSample:
                         patchValue=self.histMean(data[:self.stimuli[0][i]+self.stimulyDuration])
                     else:
                         patchValue=self.histMean(data[self.stimuli[0][i]-(self.stimuli[1][i]-self.stimuli[0][i]):self.stimuli[0][i]])
-                    data[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue
+                    processedData[self.stimuli[0][i]:self.stimuli[1][i]]=patchValue
                 except:
-                    self.hardError=1
-                    return data    
-            return data
+                    self.hardError=1   
+            return processedData
         else:
             return data
 
@@ -314,7 +315,7 @@ class dataSample:
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=float16(std+std*sqrt(self.snr/2))#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
+        SD=float16(std+std*sqrt(sqrt(self.snr))/2)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
@@ -575,7 +576,8 @@ class dataSample:
                 ax.axvline(x=self.stimuli[0][i],color='g')
         except:
             print "Unexpected error wile ploating computedData:", sys.exc_info()
-            self.hardError=1 
+            self.hardError=1
+         
         if self.debug==1:   
             #    ax.locator_params(nbins=3)
             bx = axes_list[1]
@@ -589,11 +591,16 @@ class dataSample:
             normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
             cx.imshow(normMatrixAfter, aspect='auto')
             plt.tight_layout()
+            #
+            fig2, ax2 = plt.subplots(1, 1)
+            ax2.plot(self.data,'y')
+            #
             plt.show()
         else:
             plt.savefig(self.fileName+"_graph.png")
             #plt.show()
             plt.close()# very important to stop memory leak
+        
         del fig
         
     def writeData(self):
