@@ -119,6 +119,21 @@ class Mysql_writer:
         self.conn.commit()
         cursor.close()
         
+    def dbWriteSignalProperties(self,ptp,snr,std,mainLevel):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT idrecord \
+                             FROM record \
+                             ORDER BY idrecord\
+                             DESC LIMIT 1;")
+        self.idRecord = cursor.fetchall()[0][0]
+        try:
+            cursor.execute("INSERT INTO signalProperties(record_idrecord,ptp,snr,std,mainLevel)\
+                             VALUES(%s,%s,%s,%s,%s)", (str(self.idRecord),str(ptp),str(snr),str(std),str(mainLevel)))
+        except:
+            pass
+        self.conn.commit()
+        cursor.close()
+        
     def dbWriteError(self,soft,hard):
         cursor = self.conn.cursor()
         cursor.execute("UPDATE record\
@@ -131,7 +146,7 @@ class Mysql_writer:
         #print("dbWriteSpike")
         ampl=tmpObject.spikeAmpl
         number=tmpObject.spikeNumber
-        sLength=tmpObject.spikeMax2-tmpObject.spikeMax1#must be changed to length at 80% or something like that
+        sLength=tmpObject.spikeLength#must be changed to length at 80% or something like that
         maxdiff=tmpObject.spikeMax2Val-tmpObject.spikeMax1Val
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\

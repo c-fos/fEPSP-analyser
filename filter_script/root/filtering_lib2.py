@@ -205,6 +205,7 @@ class dataSample:
         minSD=self.stdFinder(data,frameSize)
         maxSD=ptp(data)
         snr=float16(maxSD/minSD)
+        self.signalPtp=maxSD
         if self.debug==1:
             print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
         return snr
@@ -285,7 +286,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int((math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5))-1)#
+        self.mainLevel=int((math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5))-2)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
@@ -315,6 +316,7 @@ class dataSample:
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
+        self.signalStd=std
         SD=float16(std+std*sqrt(sqrt(self.snr))/2)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
@@ -349,9 +351,20 @@ class dataSample:
                 tmpObject.spikeMax2=spikePoints[i][2]
                 tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
                 tmpObject.spikeAmpl=ampl
+                tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
                 tmpObject.calculate()
         if self.debug==1:
             print((self.fileName,self.spikeDict))
+            
+    def getSpikeLength(self,max1,min1,max2):
+        h1=self.result[max1]-self.result[min1]
+        h1Part=self.result[max1]-h1*(1-0.5)#50% of first spike front
+        firstPoint=where(self.result[max1:min1]<h1Part)[0][0]
+        h2=self.result[max2]-self.result[min1]
+        h2Part=self.result[max2]-h2*(1-0.5)#50% of first spike front
+        secondPoint=where(self.result[min1:max2]<h2Part)[0][0]
+        length=(secondPoint-firstPoint)*2
+        return length
      
             
     def responsLength(self):
@@ -605,6 +618,7 @@ class dataSample:
         
     def writeData(self):
         if self.write:
+            self.mysql_writer.dbWriteSignalProperties(self.signalPtp,self.snr,self.signalStd,self.mainLevel)
             for i in self.responseDict.values():
                 tmpObject=getattr(self,i)
                 self.mysql_writer.dbWriteResponse(tmpObject)
