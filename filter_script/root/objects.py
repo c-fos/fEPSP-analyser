@@ -24,7 +24,7 @@ class Spike:
         self.spikeFrequency=0 #hZ
     
     def calculate(self):
-        self.spikeLength=1000.0*(self.spikeMax2-self.spikeMax1)/self.frequency#msec
+        #self.spikeLength=1000.0*(self.spikeMax2-self.spikeMax1)/self.frequency#msec
         self.spikeFrequency=(1.0/self.spikeLength)*1000
 
 

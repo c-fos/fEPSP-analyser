@@ -206,21 +206,24 @@ class dataSample:
         maxSD=ptp(data)
         snr=float16(maxSD/minSD)
         self.signalPtp=maxSD
+        self.signalStd=data.std()
         if self.debug==1:
             print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
-        return snr
-
-
-      
+        return snr     
 
 
     def findStimuli(self,data):
         pwr=pywt.swt(data, 'haar', 2)
         pwr2=abs(array(pwr[0][1]))
-        treshold=max(pwr2)/2
-        pwr2[pwr2<treshold]=0
-        pwr2[pwr2>0]=treshold 
-        dpwr=where((diff(pwr2)>treshold/2)==True)[0]
+        self.HiFrequNoise=pwr2
+        self.stimTreshold=pwr2.std()
+        treshold=pwr2.std()
+        pwr3=zeros(len(pwr2))
+        pwr3[1:]+=diff(pwr2)
+        pwr3[0]=pwr3[1]
+        pwr3[pwr3<treshold]=0
+        pwr3[pwr3>0]=treshold
+        dpwr=where((diff(pwr3)>treshold/2)==True)[0]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
             if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
@@ -230,17 +233,20 @@ class dataSample:
                 print("number of finded stimuls - %s" % len(dpwr))          
         stimList=[[],[]]
         for i in range(len(dpwr)):
-            start=dpwr[i]-10
+            start=dpwr[i]-int(self.stimulyDuration/20)
             length=self.stimulyDuration/4
-            baseline=self.histMean(data[start-30:start])
-            baseStd=data[start-30:start].std()
+            baseline=self.histMean(data[start-int(self.stimulyDuration/7):start])
+            baseStd=data[start-int(self.stimulyDuration/7):start].std()
             tmpStop=start+length
             if tmpStop+self.defaultFrame+5>len(data):
                 tmpStop=len(data)-self.defaultFrame-5
-            stimMean=data[start+10:tmpStop].mean()
+            stimMean=data[start+int(self.stimulyDuration/20):tmpStop].mean()
             if self.debug==1:
                 print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
-            sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],10)
+            try:
+                sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
+            except:
+                sample=data[tmpStop-int(self.stimulyDuration/40):tmpStop+self.defaultFrame+int(self.stimulyDuration/40)]
             firstArray=abs(diff(sample))<=0.1
             secondArray=abs(sample[1:]-baseline)<baseStd/2
             thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
@@ -286,7 +292,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int((math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5))-2)#
+        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-0.7)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
@@ -303,7 +309,7 @@ class dataSample:
                     print(("noisLevel",i))
             else:
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
-                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**4))
+                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         self.result=iswt(self.coeffs,self.wavelet)
@@ -316,7 +322,6 @@ class dataSample:
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        self.signalStd=std
         SD=float16(std+std*sqrt(sqrt(self.snr))/2)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
@@ -362,8 +367,11 @@ class dataSample:
         firstPoint=where(self.result[max1:min1]<h1Part)[0][0]
         h2=self.result[max2]-self.result[min1]
         h2Part=self.result[max2]-h2*(1-0.5)#50% of first spike front
-        secondPoint=where(self.result[min1:max2]<h2Part)[0][0]
-        length=(secondPoint-firstPoint)*2
+        secondPoint=where(self.result[min1:max2]>h2Part)[0][0]
+        length=(secondPoint+(min1-(max1+firstPoint)))*2
+        if self.debug==1:
+            print "spike lendth finding"
+            print((max1,min1,max2,h1,h1Part,h2,h2Part,firstPoint,secondPoint,length,"\nmax1,min1,max2,h1,h1Part,h2,h2Part,firstPoint,secondPoint,length"))
         return length
      
             
@@ -478,6 +486,7 @@ class dataSample:
         else:
             ar1=Rbf(sample2Points[sample2Points%10==0],sample2[sample2Points%10==0],smooth=0.01)
         xr1=ar1(sample2Points)
+        self.epileptStd=self.calculateEpilept(sample2,xr1)
         step=len(sample2Points)/8
         for i in range(8):
             mask[tmpObject2.spikeMax2-tmpObject.responseStart+step*i]=1
@@ -503,6 +512,10 @@ class dataSample:
         except:
             print "Unexpected error in reconstruction:", sys.exc_info()
             return 0,0
+        
+    def calculateEpilept(self,sample2,xr1):
+        diffSample=sample2-xr1
+        return diffSample.std()
         
     def epspAnaliser(self,y):
         maxvalue=max(y)
@@ -540,9 +553,10 @@ class dataSample:
             tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
             tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
             tmpObject.epspFront=0
-            tmpObject.epspBack=0
+            tmpObject.epspBack=0            
             try:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
+                tmpObject.epspEpileptStd=self.epileptStd
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
                 self.hardError=1
@@ -591,7 +605,7 @@ class dataSample:
             print "Unexpected error wile ploating computedData:", sys.exc_info()
             self.hardError=1
          
-        if self.debug==1:   
+        if self.debug==1:
             #    ax.locator_params(nbins=3)
             bx = axes_list[1]
             bx.set(xlabel="x-label", ylabel="y-label", title="before filtering")
@@ -600,9 +614,11 @@ class dataSample:
             bx.imshow(normMatrixBefore, aspect='auto')
             #print(self.coefsBeforeF.size())
             cx = axes_list[2]
-            cx.set(xlabel="x-label", ylabel="y-label", title="after filtering")
+            cx.set(xlabel="x-label", ylabel="y-label", title="hiFrequNoise")
             normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
-            cx.imshow(normMatrixAfter, aspect='auto')
+            #cx.imshow(normMatrixAfter, aspect='auto')
+            cx.plot(diff(self.HiFrequNoise))
+            cx.axhline(self.stimTreshold)
             plt.tight_layout()
             #
             fig2, ax2 = plt.subplots(1, 1)

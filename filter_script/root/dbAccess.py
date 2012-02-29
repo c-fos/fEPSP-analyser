@@ -113,9 +113,9 @@ class Mysql_writer:
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
         self.idRecord = cursor.fetchall()[0][0]
-        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront, epspBack)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
-                             str(tmpObject.epspFront),str(tmpObject.epspBack)))
+        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
+                             str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd)))
         self.conn.commit()
         cursor.close()
         
