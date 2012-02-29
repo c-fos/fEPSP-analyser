@@ -3,7 +3,7 @@ Created on 15.02.2012
 
 @author: pilat
 '''
-from hcluster import fclusterdata
+from scipy.cluster.hierarchy import fclusterdata
 from numpy import array, unique, where, zeros
 import sys
 
