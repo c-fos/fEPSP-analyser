@@ -126,7 +126,7 @@ class dataSample:
         self.wavelet='sym5'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-        self.coeffTreshold = int(self.arguments[4])
+        self.coeffTreshold = int(self.arguments[4])+3
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -213,17 +213,23 @@ class dataSample:
 
 
     def findStimuli(self,data):
-        pwr=pywt.swt(data, 'haar', 2)
-        pwr2=abs(array(pwr[0][1]))
-        self.HiFrequNoise=pwr2
-        self.stimTreshold=pwr2.std()
-        treshold=pwr2.std()
-        pwr3=zeros(len(pwr2))
-        pwr3[1:]+=diff(pwr2)
-        pwr3[0]=pwr3[1]
-        pwr3[pwr3<treshold]=0
-        pwr3[pwr3>0]=treshold
-        dpwr=where((diff(pwr3)>treshold/2)==True)[0]
+        wavelet='haar'
+        filterSize=pywt.Wavelet(wavelet).dec_len
+        pwr=pywt.swt(data, wavelet, 2)
+        pwr2=array(pwr[0][1])
+        pwr3=pywt.swt(pwr2, wavelet, 2)
+        pwr4S=abs(array(pwr3[0][1]))
+        self.HiFrequNoise1=pwr2
+        self.HiFrequNoise2=pwr4S
+        pwr4Std=self.stdFinder(pwr4S[self.deltaLen:], self.defaultFrame)
+        treshold=pwr4Std*11#11 - empirical finding koef         
+        self.stimTreshold=treshold
+        pwr5=zeros(len(pwr4S))
+        pwr5[1:]+=abs(diff(pwr4S))
+        pwr5[0]=pwr5[1]
+        pwr5[pwr5<treshold]=0
+        pwr5[pwr5>0]=treshold
+        dpwr=where((diff(pwr5)>treshold/2)==True)[0]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
             if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
@@ -233,25 +239,33 @@ class dataSample:
                 print("number of finded stimuls - %s" % len(dpwr))          
         stimList=[[],[]]
         for i in range(len(dpwr)):
-            start=dpwr[i]-int(self.stimulyDuration/20)
+            start=dpwr[i]+filterSize*2
             length=self.stimulyDuration/4
-            baseline=self.histMean(data[start-int(self.stimulyDuration/7):start])
-            baseStd=data[start-int(self.stimulyDuration/7):start].std()
+            if self.stimulyDuration/7>5:
+                baseline=self.histMean(data[start-int(self.stimulyDuration/7):start])
+                baseStd=data[start-int(self.stimulyDuration/7):start].std()
+            else:
+                baseline=data[start-1]
+                baseStd=data[start-6:start-1].std()
             tmpStop=start+length
             if tmpStop+self.defaultFrame+5>len(data):
                 tmpStop=len(data)-self.defaultFrame-5
-            stimMean=data[start+int(self.stimulyDuration/20):tmpStop].mean()
+            stimMean=data[start:tmpStop].mean()
             if self.debug==1:
                 print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
             try:
                 sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
             except:
                 sample=data[tmpStop-int(self.stimulyDuration/40):tmpStop+self.defaultFrame+int(self.stimulyDuration/40)]
-            firstArray=abs(diff(sample))<=0.1
+            firstArray=abs(diff(sample))<=baseStd
             secondArray=abs(sample[1:]-baseline)<baseStd/2
-            thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
+            #thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
+            fourthArray=self.stdArray(sample[1:],5)<=baseStd*3
+            fivthArray=abs(sample[1:]-baseline)<baseStd*4
+            if self.debug==1:
+                print((any(firstArray==True),any(secondArray==True),any(fourthArray==True),any(fivthArray==True)))
             try:
-                shift=where((firstArray+secondArray)*thirdArray==True)[0]
+                shift=where((firstArray*fivthArray+secondArray)*fourthArray==True)[0]
                 if len(shift)>0:
                     realStop=tmpStop+shift[0]
                 else:
@@ -266,6 +280,18 @@ class dataSample:
             stimList[0]+=[start]
             stimList[1]+=[realStop]
         self.stimuli=stimList
+
+    def stdArray(self,sample,frame):
+        print("stdArray")
+        test=empty(len(sample)+frame*2)
+        result=empty(len(sample))
+        test[frame:-frame]=sample
+        test[:frame]=sample[:frame]
+        test[-frame:]=sample[-frame:]
+        for i in range(len(sample)):
+            result[i]=test[i:i+frame*2].std()
+        print(len(sample),len(result),"len(sample),len(result)")
+        return result
 
     def cutStimuli(self,data):
         try:
@@ -341,6 +367,8 @@ class dataSample:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
             ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
+            if self.debug==1:
+                print(("Len of SpikePoints=%s,Spike %s, ampl=%s,SD=%s" % (len(spikePoints),i,ampl,SD)))
             if ampl>SD:
                 index=len(self.spikeDict)
                 self.spikeDict[index]="n"+str(i)
@@ -357,17 +385,24 @@ class dataSample:
                 tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
                 tmpObject.spikeAmpl=ampl
                 tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
-                tmpObject.calculate()
         if self.debug==1:
             print((self.fileName,self.spikeDict))
             
     def getSpikeLength(self,max1,min1,max2):
         h1=self.result[max1]-self.result[min1]
         h1Part=self.result[max1]-h1*(1-0.5)#50% of first spike front
-        firstPoint=where(self.result[max1:min1]<h1Part)[0][0]
         h2=self.result[max2]-self.result[min1]
         h2Part=self.result[max2]-h2*(1-0.5)#50% of first spike front
-        secondPoint=where(self.result[min1:max2]>h2Part)[0][0]
+        try:
+            firstPoint=where(self.result[max1:min1]<h1Part)[0][0]        
+            secondPoint=where(self.result[min1:max2]>h2Part)[0][0]
+        except:
+            try:
+                firstPoint=where(self.result[max1:min1]<h1Part)[0]        
+                secondPoint=where(self.result[min1:max2]>h2Part)[0]
+            except:
+                firstPoint=(min1-max1)/2
+                secondPoit=(max2-min1)/2
         length=(secondPoint+(min1-(max1+firstPoint)))*2
         if self.debug==1:
             print "spike lendth finding"
@@ -617,7 +652,8 @@ class dataSample:
             cx.set(xlabel="x-label", ylabel="y-label", title="hiFrequNoise")
             normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
             #cx.imshow(normMatrixAfter, aspect='auto')
-            cx.plot(diff(self.HiFrequNoise))
+            cx.plot(abs(diff(self.HiFrequNoise1)),'g')
+            cx.plot(abs(diff(self.HiFrequNoise2)),'b')
             cx.axhline(self.stimTreshold)
             plt.tight_layout()
             #
