@@ -126,7 +126,7 @@ class dataSample:
         self.wavelet='sym5'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-        self.coeffTreshold = int(self.arguments[4])+3
+        self.coeffTreshold = int(self.arguments[4])+4
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -318,7 +318,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-0.7)#
+        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.0)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
@@ -335,7 +335,7 @@ class dataSample:
                     print(("noisLevel",i))
             else:
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
-                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**2))
+                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold*(1+i)+i**2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         self.result=iswt(self.coeffs,self.wavelet)
@@ -606,7 +606,7 @@ class dataSample:
             ax = axes_list[0]
         else:
             fig, ax = plt.subplots(1, 1)
-        ax.plot(self.data,'y')
+        ax.plot(self.cleanData,'y')
         try:
             ax.plot(self.result,'b')
             try:

@@ -16,35 +16,32 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
+        self.rTagDict={"полу":"полумаксимум","тета":"тетанизация","инк":"инкубация"}
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
         if len(tagList)>0:
             cursor = self.conn.cursor()
             for i in tagList:
-                tagId = self.tagCheck(i)
+                tagId = self.tagCheck(i,'tagTable','tagId')
                 cursor.execute("INSERT INTO experimentTags(experiment_idexperiment,tagTable_tagId)\
                              VALUES (%s,%s);", (self.idExperiment,tagId))
             self.conn.commit()
             cursor.close()   
         
 
-    def tagCheck(self,tag):
+    def tagCheck(self,tag,table,idName):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT tagId \
-                             FROM tagTable \
-                             WHERE tagName='%s';" % tag)
+        cursor.execute("SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
         try:
-            tagId = cursor.fetchall()[0][0]
+            tagId = cursor.fetchone()[0]
         except:
             print "there are no '%s' tag" % tag, sys.exc_info()
-            cursor.execute("INSERT INTO tagTable(tagName)\
-                             VALUES ('%s');" % tag)
+            cursor.execute("INSERT INTO {0}(tagName)\
+                             VALUES ('{1}');".format(table,tag))
             self.conn.commit()
-            cursor.execute("SELECT tagId \
-                             FROM tagTable \
-                             WHERE tagName='%s';" % tag)
-            tagId = cursor.fetchall()[0][0]
+            cursor.execute("SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
+            tagId = cursor.fetchone()[0]
         return tagId
                 
     def variables_global(self):
@@ -88,7 +85,7 @@ class Mysql_writer:
                              FROM experiment \
                              ORDER BY idexperiment\
                              DESC LIMIT 1;")
-        self.idExperiment = cursor.fetchall()[0][0]
+        self.idExperiment = cursor.fetchone()[0]
         cursor.close()
         
     def dbWriteRecord(self):
@@ -98,21 +95,46 @@ class Mysql_writer:
                                             experiment_idexperiment)\
                         VALUES(%s,%s,%s);", (fileName,self.time,str(self.idExperiment)))
         self.conn.commit()
-        cursor.close() 
-
+        cursor.execute("SELECT idrecord \
+                             FROM record \
+                             ORDER BY idrecord\
+                             DESC LIMIT 1;")
+        self.idRecord = cursor.fetchone()[0]
+        cursor.close()
+         
+    def findTags(self,tagString,tagDict):
+        #tagIndexes=[string.count(i) for i in tagDict.keys()]
+        tagList=[]
+        for i in tagDict.keys():
+            if tagString.count(i)==1:
+                tagList.append(tagDict[i])
+        return tagList
+        
+    def dbWriteRecordTags(self,filename):
+        tagList = self.findTags(filename,(self.rTagDict))
+        if len(tagList)>0:
+            for i in tagList:
+                tagId = self.tagCheck(i,"recordTags","idrecordTags")
+                cursor = self.conn.cursor()
+                cursor.execute("INSERT INTO recordToTags(record_idrecord,recordTags_idrecordTags)\
+                             VALUES (%s,%s);", (self.idRecord,tagId))
+                self.conn.commit()
+            cursor.close() 
+    
     def dbWriteResponse(self,tmpObject):
         #print("dbWriteResponse")
         rNumber=tmpObject.responsNumber
         vpsp=tmpObject.vpsp
         nOfSpikes=len(tmpObject.spikes)
-        rLength=tmpObject.responseEnd-tmpObject.responseStart
-        
+        rLength=tmpObject.responseEnd-tmpObject.responseStart        
         cursor = self.conn.cursor()
+        """
         cursor.execute("SELECT idrecord \
                              FROM record \
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
         self.idRecord = cursor.fetchall()[0][0]
+        """
         cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd)\
                              VALUES(%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
                              str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd)))

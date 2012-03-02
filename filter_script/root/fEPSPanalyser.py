@@ -17,7 +17,7 @@
 """
 '''
 Created on 23.11.2011
-@author: pilat (pilat1988@gmail.com)
+@author: Malakhin Ilya (pilat1988@gmail.com)
 
 usage: "python2 fEPSP-analyser.py $arg1 $arg2 $arg3 $arg4 $arg5"
     where:
@@ -75,6 +75,7 @@ class fepspAnalyser:
                     mysql_writer.filePath=i
                     mysql_writer.time = creatingTime
                     mysql_writer.dbWriteRecord()
+                    mysql_writer.dbWriteRecordTags(fileName)
                 dataSample1=dataSample(i,mysql_writer,arguments)
                 dataSample1.dataProcessing()
                 if dataSample1.hardError==1:
