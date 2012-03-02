@@ -16,7 +16,7 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.rTagDict={"полу":"полумаксимум","тета":"тетанизация","инк":"инкубация"}
+        self.rTagDict={"коф":"инкубация","полу":"полумаксимум","тета":"тетанизация","инк":"инкубация"}
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
@@ -112,14 +112,17 @@ class Mysql_writer:
         
     def dbWriteRecordTags(self,filename):
         tagList = self.findTags(filename,(self.rTagDict))
-        if len(tagList)>0:
-            for i in tagList:
-                tagId = self.tagCheck(i,"recordTags","idrecordTags")
-                cursor = self.conn.cursor()
-                cursor.execute("INSERT INTO recordToTags(record_idrecord,recordTags_idrecordTags)\
+        if len(tagList)==0:
+            tagList = ["-"]
+        print(tagList)
+        cursor = self.conn.cursor()
+        for i in tagList:
+            tagId = self.tagCheck(i,"recordTags","idrecordTags")
+            print((self.idRecord,tagId))
+            cursor.execute("INSERT INTO recordToTags(record_idrecord,recordTags_idrecordTags)\
                              VALUES (%s,%s);", (self.idRecord,tagId))
-                self.conn.commit()
-            cursor.close() 
+            self.conn.commit()
+        cursor.close()
     
     def dbWriteResponse(self,tmpObject):
         #print("dbWriteResponse")

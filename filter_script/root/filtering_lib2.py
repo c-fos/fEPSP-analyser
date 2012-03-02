@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, asmatrix, append, math, empty, sqrt, histogram, ones,ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -160,7 +160,7 @@ class dataSample:
 
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
-        self.defaultFrame=5*msec #frame size for mean() and std() finding must depend on frequency. assume it equeal to 5msec
+        self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equeal to 5msec
         self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
         self.baseFrequency=300 #we must separate the levels of wavelet decomposition wich contains most part of the signal
@@ -203,14 +203,17 @@ class dataSample:
             
     def snrFinding(self,data,frameSize):
         minSD=self.stdFinder(data,frameSize)
-        maxSD=ptp(data)
+        maxSD=self.getLocalPtp(data,frameSize*0.8)
         snr=float16(maxSD/minSD)
         self.signalPtp=maxSD
-        self.signalStd=data.std()
+        self.signalStd=minSD
         if self.debug==1:
             print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
-        return snr     
-
+        return snr 
+    
+    def getLocalPtp(self,data,framesize):
+        ptpList=[i.ptp() for i in [data[j:j+framesize] for j in arange(0,len(data)-framesize,framesize/3)]] 
+        return max(ptpList)
 
     def findStimuli(self,data):
         wavelet='haar'
@@ -318,7 +321,7 @@ class dataSample:
 
 
     def mainLevelFinding(self):
-        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.0)#
+        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.4)#
         if self.debug==1:
             print("self.mainLevel,self.snr",self.mainLevel,self.snr)
     
@@ -335,7 +338,9 @@ class dataSample:
                     print(("noisLevel",i))
             else:
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
-                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold*(1+i)+i**2))
+                maxSD=self.getLocalPtp(cD[self.deltaLen:],self.defaultFrame*0.8)
+                snr=maxSD/minSD
+                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold*(sqrt(sqrt(snr))+i)+i**2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         self.result=iswt(self.coeffs,self.wavelet)
@@ -363,7 +368,7 @@ class dataSample:
                 if maximum[j]>minimum[i]:
                     tmpMaximum2=j
                     break
-            if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD:
+            if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD and (maximum[tmpMaximum2]-maximum[tmpMaximum1])>self.stimulyDuration:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
             ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
