@@ -50,8 +50,8 @@ class MyForm(QtGui.QMainWindow):
         
     def mkDbConfig(self):
         fd=open("dbConfig",'w')
-        list=[str(self.ui.dbServerIpLine.text()),str(self.ui.dbNameLine.text()),str(self.ui.dbUserLine.text()),str(self.ui.dbPassLine.text())]
-        pickle.dump(list,fd)
+        tmpList=[str(self.ui.dbServerIpLine.text()),str(self.ui.dbNameLine.text()),str(self.ui.dbUserLine.text()),str(self.ui.dbPassLine.text())]
+        pickle.dump(tmpList,fd)
         fd.close()
     
     def loadConfig(self):

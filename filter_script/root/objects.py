@@ -22,6 +22,8 @@ class Spike:
         #secondary variables
         self.spikeLength=0    #msec        
         self.spikeFrequency=0 #hZ
+        self.spikeFront=0
+        self.spikeBack=0
     
   #  def calculate(self):
         #self.spikeLength=1000.0*(self.spikeMax2-self.spikeMax1)/self.frequency#msec
@@ -30,4 +32,7 @@ class Spike:
 
 class Response:
     def __init__(self):
-        pass
+        self.epspFront=0
+        self.epspBack=0    
+        self.epspEpileptStd=0
+        

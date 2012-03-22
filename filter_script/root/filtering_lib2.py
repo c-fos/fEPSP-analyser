@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -18,6 +18,7 @@ from scipy.interpolate import Rbf
 from scipy import polyval, polyfit
 from clussterization import clusterization, clusterAnalyser
 from checkResult import resultAnalysis
+import rInterface
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -116,7 +117,7 @@ class dataSample:
                     print "dbWriteError error:", sys.exc_info()
                     self.hardError=1
         try:
-            resultAnalysis(self)
+            resultAnalysis(self,self.debug)
         except:
             print "resultAnalysis error:", sys.exc_info()
             self.hardError=1        
@@ -221,18 +222,22 @@ class dataSample:
         pwr=pywt.swt(data, wavelet, 2)
         pwr2=array(pwr[0][1])
         pwr3=pywt.swt(pwr2, wavelet, 2)
-        pwr4S=abs(array(pwr3[0][1]))
+        #pwr=array(pwr3[0][1])
+        #pwr3=pywt.swt(pwr, wavelet, 2)
+        
+        pwr4S=array(pwr3[0][1])
         self.HiFrequNoise1=pwr2
-        self.HiFrequNoise2=pwr4S
+        self.HiFrequNoise2=abs(pwr4S)
         pwr4Std=self.stdFinder(pwr4S[self.deltaLen:], self.defaultFrame)
-        treshold=pwr4Std*11#11 - empirical finding koef         
+        pwr4ptp=pwr4S.ptp()
+        treshold=pwr4Std*3*log(pwr4ptp/pwr4Std)#11 - empirical finding koef         
         self.stimTreshold=treshold
         pwr5=zeros(len(pwr4S))
         pwr5[1:]+=abs(diff(pwr4S))
         pwr5[0]=pwr5[1]
         pwr5[pwr5<treshold]=0
         pwr5[pwr5>0]=treshold
-        dpwr=where((diff(pwr5)>treshold/2)==True)[0]
+        dpwr=where((diff(pwr5)==treshold)==True)[0]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
             if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
@@ -285,7 +290,6 @@ class dataSample:
         self.stimuli=stimList
 
     def stdArray(self,sample,frame):
-        print("stdArray")
         test=empty(len(sample)+frame*2)
         result=empty(len(sample))
         test[frame:-frame]=sample
@@ -293,7 +297,6 @@ class dataSample:
         test[-frame:]=sample[-frame:]
         for i in range(len(sample)):
             result[i]=test[i:i+frame*2].std()
-        print(len(sample),len(result),"len(sample),len(result)")
         return result
 
     def cutStimuli(self,data):
@@ -352,8 +355,13 @@ class dataSample:
         stop=-self.defaultFrame/4
         minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
+        tmpMaximum=maximum.tolist()
+        tmpMaximum.extend(array(self.stimuli[1])-start)
+        maximum=array(tmpMaximum)
+        maximum.sort()
+        maximumValue=resultData[maximum+start]
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=float16(std+std*sqrt(sqrt(self.snr))/2)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
+        SD=float16(std+std*sqrt(sqrt(self.snr))/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
@@ -368,30 +376,74 @@ class dataSample:
                 if maximum[j]>minimum[i]:
                     tmpMaximum2=j
                     break
-            if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD and (maximum[tmpMaximum2]-maximum[tmpMaximum1])>self.stimulyDuration:
+            if maximumValue[tmpMaximum1]-minimumValue[i]>SD and maximumValue[tmpMaximum2]-minimumValue[i]>SD\
+             and (maximum[tmpMaximum2]-maximum[tmpMaximum1])>self.stimulyDuration/2:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
-            ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
-            if self.debug==1:
-                print(("Len of SpikePoints=%s,Spike %s, ampl=%s,SD=%s" % (len(spikePoints),i,ampl,SD)))
-            if ampl>SD:
-                index=len(self.spikeDict)
-                self.spikeDict[index]="n"+str(i)
-                setattr(self,self.spikeDict[index],Spike(self.frequency))
-                tmpObject=getattr(self,self.spikeDict[index])                
-                tmpObject.responseStart=start
-                tmpObject.responseEnd=stop
-                tmpObject.spikeNumber=i
-                tmpObject.spikeMax1=spikePoints[i][0]
-                tmpObject.spikeMax1Val=self.result[spikePoints[i][0]]
-                tmpObject.spikeMin=spikePoints[i][1]
-                tmpObject.spikeMinVal=self.result[spikePoints[i][1]]
-                tmpObject.spikeMax2=spikePoints[i][2]
-                tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
-                tmpObject.spikeAmpl=ampl
-                tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
+            try:
+                ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+\
+                       (resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/\
+                       (spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
+                if self.debug==1:
+                    print(("Len of SpikePoints=%s,Spike %s, ampl=%s,SD=%s" % (len(spikePoints),i,ampl,SD)))
+                if ampl>SD:
+                    index=len(self.spikeDict)
+                    self.spikeDict[index]="n"+str(i)
+                    setattr(self,self.spikeDict[index],Spike(self.frequency))
+                    tmpObject=getattr(self,self.spikeDict[index])                
+                    tmpObject.responseStart=start
+                    tmpObject.responseEnd=stop
+                    tmpObject.spikeNumber=0#i bkup
+                    tmpObject.spikeMax1=spikePoints[i][0]
+                    tmpObject.spikeMax1Val=self.result[spikePoints[i][0]]
+                    tmpObject.spikeMin=spikePoints[i][1]
+                    tmpObject.spikeMinVal=self.result[spikePoints[i][1]]
+                    tmpObject.spikeMax2=spikePoints[i][2]
+                    tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
+                    tmpObject.spikeAmpl=ampl
+                    tmpObject.spikeDelay=0
+                    tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
+                    tmpObject.spikeFront,tmpObject.spikeBack=self.getSpikeAngles(resultData[spikePoints[i][0]:spikePoints[i][2]])
+            except:
+                print "Unexpected error in finding of stimuli end:", sys.exc_info()
         if self.debug==1:
             print((self.fileName,self.spikeDict))
+        
+    def checkForFibrePotential(self,spikeList):
+        tmpObject = getattr(self,spikeList[0])#this computation writing as distinct function because i will add more filters later
+        if tmpObject.spikeNumber!=0:
+            print("error in fibre potential check") 
+        if rInterface.neuroCheck(tmpObject.spikeLength,tmpObject.spikeFront,self.frequency/1000)<0.1:
+            print("There are AP at zero position")
+            for i in spikeList:
+                tmpObject = getattr(self,i)
+                tmpObject.spikeNumber=tmpObject.spikeNumber+1
+        return spikeList
+        
+    def getSpikeAngles(self,sample):
+        sampleMin = min(sample)
+        try:
+            minPoint = where(sample==sampleMin)[0][0]
+        except:
+            minPoint = where(sample==sampleMin)[0]
+        max1 = sample[0]
+        max2 = sample[-1]
+        h1 = max1-sampleMin
+        point1 = where(sample[:minPoint]<(max1-h1*0.2))[0][0]
+        point2 = where(sample[:minPoint]<(max1-h1*0.8))[0][0]
+        h2 = max2-sampleMin
+        point3 = where(sample[minPoint:]>(sampleMin+h2*0.2))[0][0]
+        point4 = where(sample[minPoint:]>(sampleMin+h2*0.8))[0][0]
+        
+        if point2-point1>0:
+            angle1 = (sample[point1]-sample[point2])/(point2-point1)
+        else:
+            angle1 = sample[point1]-sample[point2]
+        if point4-point3>0:
+            angle2 = (sample[point4]-sample[point3])/(point4-point3)
+        else:
+            angle2 = sample[point4]-sample[point3]
+        return angle1,-angle2
             
     def getSpikeLength(self,max1,min1,max2):
         h1=self.result[max1]-self.result[min1]
@@ -407,7 +459,7 @@ class dataSample:
                 secondPoint=where(self.result[min1:max2]>h2Part)[0]
             except:
                 firstPoint=(min1-max1)/2
-                secondPoit=(max2-min1)/2
+                secondPoint=(max2-min1)/2
         length=(secondPoint+(min1-(max1+firstPoint)))*2
         if self.debug==1:
             print "spike lendth finding"
@@ -584,16 +636,25 @@ class dataSample:
             self.responseDict[index]="r"+str(i)
             setattr(self,self.responseDict[index],Response())
             tmpObject=getattr(self,self.responseDict[index])
-            tmpObject.responseStart=rMatrix[i-1][0]
-            tmpObject.responseEnd=rMatrix[i-1][1]
-            tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-            tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-            tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
-            tmpObject.responsNumber=i
-            tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
-            tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
-            tmpObject.epspFront=0
-            tmpObject.epspBack=0            
+            try:
+                tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
+            except:
+                print "Unexpected error wile checkForFibrePotential:", sys.exc_info()
+            try:
+                tmpObject.responseStart=rMatrix[i-1][0]
+                tmpObject.responseEnd=rMatrix[i-1][1]
+                tmpObject.length=self.getResponsLength(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
+                tmpObject.responsNumber=i
+                tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
+            except:
+                print "Unexpected error wile fill response properties:", sys.exc_info()
+            try:
+                self.setSpikeDelays(tmpObject.spikes,tmpObject.responseStart)
+            except:
+                print "Unexpected error wile setSpikeDelays:", sys.exc_info()        
             try:
                 tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
                 tmpObject.epspEpileptStd=self.epileptStd
@@ -602,7 +663,30 @@ class dataSample:
                 self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
         
-
+    def getResponsLength(self,sample):
+        h1=sample[0]-max(sample)
+        h1Part=h1*0.2#20% of first spike front
+        h2=sample[-1]-max(sample)
+        h2Part=h2*0.2
+        try:
+            firstPoint=where(sample>h1Part)[0][0]        
+            secondPoint=where(sample.revers()>h2Part)[0][0]
+        except:
+            try:
+                firstPoint=where(sample>h1Part)[0]        
+                secondPoint=where(sample.revers()>h2Part)[0]
+            except:
+                firstPoint=0
+                secondPoint=0
+        length=len(sample)-firstPoint-secondPoint
+        return length
+        
+        
+    def setSpikeDelays(self,spikeDict,startPoint):
+        for i in spikeDict:
+            tmpObject=getattr(self,i)
+            tmpObject.spikeDelay=tmpObject.spikeMin-startPoint
+               
     def plotData(self):
         #fig = plt.figure()
         #ax = fig.add_subplot(111)
@@ -662,8 +746,8 @@ class dataSample:
             cx.axhline(self.stimTreshold)
             plt.tight_layout()
             #
-            fig2, ax2 = plt.subplots(1, 1)
-            ax2.plot(self.data,'y')
+            #fig2, ax2 = plt.subplots(1, 1)
+            #ax2.plot(self.data,'y')
             #
             plt.show()
         else:
@@ -675,13 +759,24 @@ class dataSample:
         
     def writeData(self):
         if self.write:
-            self.mysql_writer.dbWriteSignalProperties(self.signalPtp,self.snr,self.signalStd,self.mainLevel)
+            try:
+                self.mysql_writer.dbWriteSignalProperties(self.signalPtp,self.snr,self.signalStd,self.mainLevel) 
+            except:
+                print "Unexpected error wile dbWriteSignalProperties:", sys.exc_info()
+            try:
+                self.mysql_writer.dbWriteNumberOfResponses(len(self.responseDict.values()))
+            except:
+                print "Unexpected error wile dbWriteNumberOfResponses:", sys.exc_info()
             for i in self.responseDict.values():
                 tmpObject=getattr(self,i)
                 self.mysql_writer.dbWriteResponse(tmpObject)
-                for j in tmpObject.spikes:
-                    tmpObject2=getattr(self,j)
-                    self.mysql_writer.dbWriteSpike(tmpObject2)
+        
+                try:
+                    for j in tmpObject.spikes:
+                        tmpObject2=getattr(self,j)
+                        self.mysql_writer.dbWriteSpike(tmpObject2)
+                except:
+                    print "Unexpected error wile dbWriteSpike:", sys.exc_info()
                 #    del tmpObject2
                 #del tmpObject
             
