@@ -40,8 +40,6 @@ from dbAccess import Mysql_writer
 from filtering_lib2 import dataSample
 import shutil
 
-
-
 class fepspAnalyser:
     
     def errorProcessing(self,filename,errorType):

@@ -16,7 +16,8 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.rTagDict={"коф":"инкубация","полу":"полумаксимум","тета":"тетанизация","инк":"инкубация"}
+        self.rTagDict={"коф":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
+        self.rTagMask=["до","перед","макс","отмыв"]
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
@@ -103,16 +104,15 @@ class Mysql_writer:
         self.idRecord = cursor.fetchone()[0]
         cursor.close()
          
-    def findTags(self,tagString,tagDict):
-        #tagIndexes=[string.count(i) for i in tagDict.keys()]
+    def findTags(self,tagString,tagDict,tagMask):
         tagList=[]
         for i in tagDict.keys():
-            if tagString.count(i)==1:
+            if (i in tagString) and (all([j not in tagString for j in tagMask])==True):
                 tagList.append(tagDict[i])
         return tagList
         
     def dbWriteRecordTags(self,filename):
-        tagList = self.findTags(filename,(self.rTagDict))
+        tagList = self.findTags(filename,(self.rTagDict),(self.rTagMask))
         if len(tagList)==0:
             tagList = ["-"]
         #print(tagList)
@@ -151,7 +151,7 @@ class Mysql_writer:
                              FROM record \
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
-        self.idRecord = cursor.fetchall()[0][0]
+        self.idRecord = cursor.fetchone()[0]
         try:
             cursor.execute("INSERT INTO signalProperties(record_idrecord,ptp,snr,std,mainLevel)\
                              VALUES(%s,%s,%s,%s,%s)", (str(self.idRecord),str(ptp),str(snr),str(std),str(mainLevel)))
@@ -176,14 +176,15 @@ class Mysql_writer:
         angle1=str(tmpObject.spikeFront)
         angle2=str(tmpObject.spikeBack)
         delay=str(tmpObject.spikeDelay)
+        maxToMin=str(tmpObject.spikeMaxToMin)
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\
                              ORDER BY idresponses\
                              DESC LIMIT 1;")
-        idResponse = cursor.fetchall()[0][0]
-        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number+1),str(idResponse),sLength,maxdiff,angle1,angle2,delay))
+        idResponse = cursor.fetchone()[0]
+        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin))
         self.conn.commit()
         cursor.close()
     def dbDisconnect(self):

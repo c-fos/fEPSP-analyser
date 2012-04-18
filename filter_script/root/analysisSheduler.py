@@ -20,7 +20,7 @@ def addDir(path):
 if sys.argv[1]=="create_list" and len(sys.argv)==3:
     dir_list=glob(sys.argv[2]+"/*")
     dir_list2=[addDir(i) for i in dir_list]
-    remove('.dir_list')
+    #remove('.dir_list')
     with open('.dir_list', 'a') as f:
         [f.write(i) for i in dir_list2]
 elif sys.argv[1]=="start" and len(sys.argv)==2:

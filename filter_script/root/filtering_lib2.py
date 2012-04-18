@@ -124,7 +124,7 @@ class dataSample:
 
 
     def argReading(self):
-        self.wavelet='sym5'#'bior3.5
+        self.wavelet='sym3'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
         self.coeffTreshold = int(self.arguments[4])+4
@@ -151,9 +151,10 @@ class dataSample:
             return unique1
     
     def dataFitting(self,data,frequency):
-        tmp=2**(math.ceil(math.log(len(data),2)))
-        self.deltaLen=tmp-len(data)
-        meanTmp=self.histMean(data)
+        dataLen=len(data)
+        tmp=2**(math.ceil(math.log(dataLen,2)))
+        self.deltaLen=tmp-dataLen
+        meanTmp=self.histMean(data[:dataLen/4])
         newData=empty(tmp, dtype='float32')
         newData.fill(meanTmp)
         newData[self.deltaLen:]=data
@@ -161,10 +162,10 @@ class dataSample:
 
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
-        self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equeal to 5msec
+        self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equal to 4 msec
         self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
-        self.baseFrequency=300 #we must separate the levels of wavelet decomposition wich contains most part of the signal
+        self.baseFrequency=300 #we must separate the levels of wavelet decomposition that contains most part of the signal
         highNoiseFrequency=14000.0
         self.highNoiseLevel=int((math.log(highNoiseFrequency/self.frequency,0.5)))
         self.localDelay=1*msec #time delay before spike(filtering of local responses)
@@ -213,35 +214,58 @@ class dataSample:
         return snr 
     
     def getLocalPtp(self,data,framesize):
-        ptpList=[i.ptp() for i in [data[j:j+framesize] for j in arange(0,len(data)-framesize,framesize/3)]] 
-        return max(ptpList)
+        ptpList=[]
+        try:
+            ptpList=[i.ptp() for i in [data[j:j+framesize] for j in arange(0,len(data)-framesize,framesize/3)]]
+        except:
+            print "Unexpected error in finding local ptp:", sys.exc_info()
+        if len(ptpList)!=0:
+            return max(ptpList)
+        else:
+            return 0
 
     def findStimuli(self,data):
         wavelet='haar'
         filterSize=pywt.Wavelet(wavelet).dec_len
         pwr=pywt.swt(data, wavelet, 2)
         pwr2=array(pwr[0][1])
-        pwr3=pywt.swt(pwr2, wavelet, 2)
-        #pwr=array(pwr3[0][1])
-        #pwr3=pywt.swt(pwr, wavelet, 2)
-        
-        pwr4S=array(pwr3[0][1])
-        self.HiFrequNoise1=pwr2
-        self.HiFrequNoise2=abs(pwr4S)
-        pwr4Std=self.stdFinder(pwr4S[self.deltaLen:], self.defaultFrame)
-        pwr4ptp=pwr4S.ptp()
-        treshold=pwr4Std*3*log(pwr4ptp/pwr4Std)#11 - empirical finding koef         
+        pwr4Std=self.stdFinder(pwr2[self.deltaLen:], self.defaultFrame)
+        pwr4ptp=pwr2.ptp()
+        treshold=pwr4Std*1.5*log(pwr4ptp/pwr4Std)#11 - empirical finding coef         
         self.stimTreshold=treshold
-        pwr5=zeros(len(pwr4S))
-        pwr5[1:]+=abs(diff(pwr4S))
+        pwr5=zeros(len(pwr2))
+        pwr5[1:]+=abs(diff(pwr2))
         pwr5[0]=pwr5[1]
         pwr5[pwr5<treshold]=0
         pwr5[pwr5>0]=treshold
+        self.HiFrequNoise2=pwr5
+        self.HiFrequNoise1=pwr2
         dpwr=where((diff(pwr5)==treshold)==True)[0]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
-            if dpwr[i+1]-dpwr[i]<self.stimulyDuration:
+            if dpwr[i+1]-dpwr[i]<self.stimulyDuration/4.0:
                 dpwrMask[i+1]=0
+        dpwr=dpwr[dpwrMask]
+        dpwrMask=ones(len(dpwr),dtype='bool')
+        for i in range(len(dpwr)):
+            length1=len(where((abs(diff(pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/4]))>=treshold)==True)[0])
+            sample1=data[dpwr[i]+filterSize*2:dpwr[i]+filterSize*2+self.stimulyDuration/4]
+            sample2=data[dpwr[i]+filterSize*2-self.stimulyDuration/2:dpwr[i]+filterSize*2-self.stimulyDuration/4]
+            sample3=pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/4]
+            sample4=pwr2[dpwr[i]+filterSize-self.stimulyDuration/2:dpwr[i]+filterSize-self.stimulyDuration/4]
+            sampleSumDiff=abs(sample1).sum()/abs(sample2).sum()
+            sampleStdDiff=sample3.std()/sample4.std()
+            samplePtpDiff=abs(sample3).mean()/abs(sample4).mean()    
+            if sampleStdDiff>2.0 and samplePtpDiff>2.0:
+                print(("len of stimulum",i,length1/(self.stimulyDuration/(self.frequency/16000.0)),self.stimulyDuration/(self.frequency/16000.0),sampleSumDiff,sampleStdDiff,samplePtpDiff))
+                if length1>=self.stimulyDuration/(self.frequency/16000.0):
+                    pass
+                elif sampleSumDiff>2 and length1>=self.stimulyDuration/(self.frequency/16000.0)/8:
+                    pass
+                else:
+                    dpwrMask[i]=0
+            else:
+                dpwrMask[i]=0
         dpwr=dpwr[dpwrMask]
         if self.debug==1:
                 print("number of finded stimuls - %s" % len(dpwr))          
@@ -260,14 +284,13 @@ class dataSample:
                 tmpStop=len(data)-self.defaultFrame-5
             stimMean=data[start:tmpStop].mean()
             if self.debug==1:
-                print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
+                print((baseline,baseStd,start,tmpStop,stimMean,"baseline,baseStd,start,tmpStop,stimMean"))
             try:
                 sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
             except:
                 sample=data[tmpStop-int(self.stimulyDuration/40):tmpStop+self.defaultFrame+int(self.stimulyDuration/40)]
             firstArray=abs(diff(sample))<=baseStd
             secondArray=abs(sample[1:]-baseline)<baseStd/2
-            #thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
             fourthArray=self.stdArray(sample[1:],5)<=baseStd*3
             fivthArray=abs(sample[1:]-baseline)<baseStd*4
             if self.debug==1:
@@ -322,12 +345,10 @@ class dataSample:
         else:
             return data
 
-
     def mainLevelFinding(self):
         self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.4)#
         if self.debug==1:
-            print("self.mainLevel,self.snr",self.mainLevel,self.snr)
-    
+            print("self.mainLevel,self.snr",self.mainLevel,self.snr)    
 
     def filtering(self):        
         self.coeffs=pywt.swt(self.cleanData, self.wavelet, level=self.mainLevel+1)
@@ -346,8 +367,7 @@ class dataSample:
                 cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold*(sqrt(sqrt(snr))+i)+i**2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
-        self.result=iswt(self.coeffs,self.wavelet)
-   
+        self.result=iswt(self.coeffs,self.wavelet)   
 
     def spikeFinding(self):
         resultData=self.result
@@ -400,6 +420,7 @@ class dataSample:
                     tmpObject.spikeMinVal=self.result[spikePoints[i][1]]
                     tmpObject.spikeMax2=spikePoints[i][2]
                     tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
+                    tmpObject.spikeMaxToMin=tmpObject.spikeMax2Val-tmpObject.spikeMinVal
                     tmpObject.spikeAmpl=ampl
                     tmpObject.spikeDelay=0
                     tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
@@ -573,19 +594,24 @@ class dataSample:
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
         sample2Points=array(range(len(sample2)))
-        if len(sample2Points)>301:
-            ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
+        if len(sample2Points)>30:
+            if len(sample2Points)>301:
+                ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
+            else:
+                ar1=Rbf(sample2Points[sample2Points%10==0],sample2[sample2Points%10==0],smooth=0.01)
+            xr1=ar1(sample2Points)
+            self.epileptStd=self.calculateEpilept(sample2,xr1)
+            step=len(sample2Points)/8
+            for i in range(8):
+                mask[tmpObject2.spikeMax2-tmpObject.responseStart+step*i]=1
+            
+            sample=append(sample1,xr1)
+            if self.debug==1:
+                print((len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd]),"len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd])"))
         else:
-            ar1=Rbf(sample2Points[sample2Points%10==0],sample2[sample2Points%10==0],smooth=0.01)
-        xr1=ar1(sample2Points)
-        self.epileptStd=self.calculateEpilept(sample2,xr1)
-        step=len(sample2Points)/8
-        for i in range(8):
-            mask[tmpObject2.spikeMax2-tmpObject.responseStart+step*i]=1
-        mask[-1]=1
-        sample=append(sample1,xr1)
-        if self.debug==1:
-            print((len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd]),"len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd])"))
+            sample=sample1
+            self.epileptStd=0
+        mask[-1]=1    
         timePoints=where(mask==True)[0]
         values=sample[mask]
         sample3=array(range(len(sample)))
@@ -777,8 +803,6 @@ class dataSample:
                         self.mysql_writer.dbWriteSpike(tmpObject2)
                 except:
                     print "Unexpected error wile dbWriteSpike:", sys.exc_info()
-                #    del tmpObject2
-                #del tmpObject
             
             
             
