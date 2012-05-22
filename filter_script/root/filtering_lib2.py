@@ -204,6 +204,7 @@ class dataSample:
                 return data.std()  
             
     def snrFinding(self,data,frameSize):
+        
         minSD=self.stdFinder(data,frameSize)
         maxSD=self.getLocalPtp(data,frameSize*0.8)
         snr=float16(maxSD/minSD)
@@ -215,6 +216,8 @@ class dataSample:
     
     def getLocalPtp(self,data,framesize):
         ptpList=[]
+        if self.debug==1:
+            print((data,len(data),framesize,"data,len(data),framesize"))
         try:
             ptpList=[i.ptp() for i in [data[j:j+framesize] for j in arange(0,len(data)-framesize,framesize/3)]]
         except:
@@ -434,7 +437,7 @@ class dataSample:
         tmpObject = getattr(self,spikeList[0])#this computation writing as distinct function because i will add more filters later
         if tmpObject.spikeNumber!=0:
             print("error in fibre potential check") 
-        if rInterface.neuroCheck(tmpObject.spikeLength,tmpObject.spikeFront,self.frequency/1000)<0.1:
+        if rInterface.neuroCheck(tmpObject.spikeMax2Val-tmpObject.spikeMax1Val,tmpObject.spikeLength,tmpObject.spikeFront,self.frequency/1000)>=0.5:
             print("There are AP at zero position")
             for i in spikeList:
                 tmpObject = getattr(self,i)
@@ -721,10 +724,12 @@ class dataSample:
             ax = axes_list[0]
         else:
             fig, ax = plt.subplots(1, 1)
+        fig.canvas.set_window_title(self.fileName.split("/")[-1]) 
         ax.plot(self.cleanData,'y')
         try:
             ax.plot(self.result,'b')
             try:
+                #pass
                 ax.plot(self.epsp[0],self.epsp[1],'r')
             except:
                 self.softError=1
@@ -768,6 +773,7 @@ class dataSample:
             normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
             #cx.imshow(normMatrixAfter, aspect='auto')
             cx.plot(abs(diff(self.HiFrequNoise1)),'g')
+            
             cx.plot(abs(diff(self.HiFrequNoise2)),'b')
             cx.axhline(self.stimTreshold)
             plt.tight_layout()
