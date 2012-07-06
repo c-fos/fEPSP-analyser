@@ -435,14 +435,16 @@ class dataSample:
         
     def checkForFibrePotential(self,spikeList):
         tmpObject = getattr(self,spikeList[0])#this computation writing as distinct function because i will add more filters later
+        fibre=1
         if tmpObject.spikeNumber!=0:
             print("error in fibre potential check") 
         if rInterface.neuroCheck(tmpObject.spikeMax2Val-tmpObject.spikeMax1Val,tmpObject.spikeLength,tmpObject.spikeFront,self.frequency/1000)>=0.5:
+            fibre=0
             print("There are AP at zero position")
             for i in spikeList:
                 tmpObject = getattr(self,i)
                 tmpObject.spikeNumber=tmpObject.spikeNumber+1
-        return spikeList
+        return fibre,spikeList
         
     def getSpikeAngles(self,sample):
         sampleMin = min(sample)
@@ -579,14 +581,30 @@ class dataSample:
         return responsMatrix
     
     def epspReconstructor(self,tmpObject):
+        """
+        The function for reconstructing shape of the inverted fEPSP
+        Where:
+            tmpObject - fEPSP event object
+        """
         tmpObject2=getattr(self,tmpObject.spikes[-1])
         sample1=self.result[tmpObject.responseStart:tmpObject2.spikeMax2]     
         mask=zeros(tmpObject.responseEnd-tmpObject.responseStart,dtype='bool')
         tmpObject2=getattr(self,tmpObject.spikes[0])
-        mask[0]=1
-        mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-        mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
-        mask[(tmpObject2.spikeMax1-tmpObject.responseStart)/2]=1
+        print(tmpObject.fibre)
+        if(tmpObject.fibre==1):
+            #mask[0]=1
+            mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+            mask[(tmpObject2.spikeMax1+tmpObject2.spikeMax2)/2-tmpObject.responseStart]=1
+            epspStart=tmpObject2.spikeMin-tmpObject.responseStart
+            mask[epspStart]=1
+        else:
+            intend=self.getFirstMaxIndent(tmpObject2.spikeMax1,self.result)
+            print(intend)
+            mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
+            mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
+            epspStart=tmpObject2.spikeMax1-intend-tmpObject.responseStart
+            mask[epspStart]=1
+            mask[epspStart+intend/2]=1
         if len(tmpObject.spikes)>=2:
             try:
                 tmpObject2=getattr(self,tmpObject.spikes[1])
@@ -622,29 +640,49 @@ class dataSample:
             sp3 = Rbf(timePoints,int16(values),smooth=1,function='thin_plate')
             y4=sp3(sample3)
             try:
-                front,back = self.epspAnaliser(y4)
+                front,back = self.epspAnaliser(y4[epspStart:])
                 self.epsp=append(self.epsp,[sample3+tmpObject.responseStart,y4],axis=1)
                 if self.debug==1:
                     print((front,back,"front,back"))
-                return front,back
+                return epspStart,front,back
             except:
                 print "Unexpected error in epspAnaliser:", sys.exc_info()
-                return 0,0      
+                return epspStart,0,0      
         except:
             print "Unexpected error in reconstruction:", sys.exc_info()
-            return 0,0
+            return epspStart,0,0
         
+    def getFirstMaxIndent(self,stop,sample):
+        """
+        This function used for calculate the distance between first max of the first spike and prior minimal extremum
+        in the case when fibre potential didn`t find 
+        """
+        i=0
+        while(sample[stop-i]>sample[stop-i-1]):
+            i+=1
+        return i
+    
     def calculateEpilept(self,sample2,xr1):
+        """
+        Function for rouge estimating the "epileptiform activity". The estimation based on the oscillations after second maximum of the last founded spike in response.
+        """
         diffSample=sample2-xr1
         return diffSample.std()
         
     def epspAnaliser(self,y):
+        """
+        Function for different fEPSP properties calculation.
+        fEPSP front: "ADC codes"/"ADC points" at the 20%-80% of fEPSP amplitude interval
+        fEPSP back: "ADC codes"/"ADC points" at the 80%-20% of fEPSP amplitude interval 
+        """
+        #preparing
         maxvalue=max(y)
         maxPoint=where(y==maxvalue)[0]
         minvalue1=min(y[:maxPoint])
         minvalue2=min(y[maxPoint:])
         ampl1=maxvalue-minvalue1
         ampl2=maxvalue-minvalue2
+        #computation
         firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0][0]
         firstValue=y[firstPoint]
         secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0][0]
@@ -658,15 +696,29 @@ class dataSample:
         return float32(front), float32(back[0])
                         
     def responsAnalysis(self):
+        """
+        Main function for response(fEPSP and all spikes induced by one stimulus)
+        The following functions are called from there:
+        
+            self.checkForFibrePotential - is the first "spike" a real spike or fibre potential
+            self.getResponsLength - get the length of response in ADC points (20% to 20% of fEPSP amplitude)
+            self.setSpikeDelays - calculate the time delay between stimulus and spike`s minimum
+            self.epspReconstructor - reconstruct the shape of fEPSP
+            self.epileptStd - rouge estimate the "epileptiform activity"
+            self.spikeArea - calculation of area between signal curve and fEPSP for one spike
+            self.epspArea - calculation of area between signal and fEPSP for all spikes
+             
+        """
         rMatrix=self.responsMatrix
         self.epsp=array([[],[]])
+        epspAreaStart=0
         for i in unique(self.clusters):
             index=len(self.responseDict)
             self.responseDict[index]="r"+str(i)
             setattr(self,self.responseDict[index],Response())
             tmpObject=getattr(self,self.responseDict[index])
             try:
-                tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
+                tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
             except:
                 print "Unexpected error wile checkForFibrePotential:", sys.exc_info()
             try:
@@ -685,12 +737,34 @@ class dataSample:
             except:
                 print "Unexpected error wile setSpikeDelays:", sys.exc_info()        
             try:
-                tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
+                epspStartCorrection,tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
+                epspAreaStart,tmpObject.epspArea=self.Area(tmpObject,epspAreaStart,epspStartCorrection)
                 tmpObject.epspEpileptStd=self.epileptStd
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
                 self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
+        
+    def Area(self,tmpObject,epspAreaStart,epspStartCorrection):
+        start=tmpObject.responseStart
+        stop=tmpObject.responseEnd
+        areaArray=self.epsp[1][epspAreaStart+epspStartCorrection:stop-start+epspAreaStart]-self.result[start+epspStartCorrection:stop]
+        #fig, ax = plt.subplots(1, 1) 
+        #ax.plot(areaArray)
+        for j in tmpObject.spikes:
+            tmpObject2=getattr(self,j)            
+            spikeStart=tmpObject2.spikeMax1-start-epspStartCorrection
+            #ax.vlines(spikeStart,100, 0, color='g', linestyles='dashed')
+            spikeStop=tmpObject2.spikeMax2-start-epspStartCorrection
+            #ax.vlines(spikeStop,100, 0, color='r', linestyles='dashed')
+            tmpObject2.area=round(sum(areaArray[spikeStart:spikeStop]))
+            print("spikeArea",j,tmpObject2.area)
+            print(areaArray[spikeStart],areaArray[spikeStop])
+        #plt.show()
+        area=round(sum(areaArray))
+        print ("area",area,epspAreaStart,epspStartCorrection)
+        epspAreaStart=epspAreaStart+stop-start
+        return epspAreaStart,area
         
     def getResponsLength(self,sample):
         h1=sample[0]-max(sample)

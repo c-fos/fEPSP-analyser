@@ -129,11 +129,12 @@ class Mysql_writer:
         rNumber=tmpObject.responsNumber
         vpsp=tmpObject.vpsp
         nOfSpikes=len(tmpObject.spikes)
-        rLength=tmpObject.length        
+        rLength=tmpObject.length
+        epspArea=tmpObject.epspArea     
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
-                             str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd)))
+        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd,epspArea)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
+                             str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd),str(epspArea)))
         self.conn.commit()
         cursor.close()
         
@@ -177,14 +178,15 @@ class Mysql_writer:
         angle2=str(tmpObject.spikeBack)
         delay=str(tmpObject.spikeDelay)
         maxToMin=str(tmpObject.spikeMaxToMin)
+        area=str(tmpObject.area)
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\
                              ORDER BY idresponses\
                              DESC LIMIT 1;")
         idResponse = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin))
+        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin,area)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin,area))
         self.conn.commit()
         cursor.close()
     def dbDisconnect(self):
