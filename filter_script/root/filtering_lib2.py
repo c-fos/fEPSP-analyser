@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
 from scipy.interpolate import Rbf
-from scipy import polyval, polyfit
+from scipy import polyval, polyfit, signal
 from clussterization import clusterization, clusterAnalyser
 from checkResult import resultAnalysis
 import rInterface
@@ -67,7 +67,8 @@ class dataSample:
             print "mainLevelFinding() error:", sys.exc_info()
             self.hardError=1
         try:
-            self.filtering()
+            self.resultRough=self.filtering(self.coeffTreshold)
+            self.result=self.filtering(self.coeffTreshold-2)
         except:
             print "filtering() error:", sys.exc_info()
             self.hardError=1
@@ -127,7 +128,7 @@ class dataSample:
         self.wavelet='sym3'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-        self.coeffTreshold = int(self.arguments[4])+4
+        self.coeffTreshold = int(self.arguments[4])+3#4
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -204,7 +205,8 @@ class dataSample:
                 return data.std()  
             
     def snrFinding(self,data,frameSize):
-        
+        if self.debug==1:
+            print((data,len(data),frameSize,"data,len(data),framesize"))
         minSD=self.stdFinder(data,frameSize)
         maxSD=self.getLocalPtp(data,frameSize*0.8)
         snr=float16(maxSD/minSD)
@@ -216,10 +218,12 @@ class dataSample:
     
     def getLocalPtp(self,data,framesize):
         ptpList=[]
+        smoothedData=signal.medfilt(data, 5)
+        smoothedDataLen=len(smoothedData)
         if self.debug==1:
             print((data,len(data),framesize,"data,len(data),framesize"))
         try:
-            ptpList=[i.ptp() for i in [data[j:j+framesize] for j in arange(0,len(data)-framesize,framesize/3)]]
+            ptpList=[i.ptp() for i in [smoothedData[j:j+framesize] for j in arange(0,smoothedDataLen-framesize,framesize/3)]]
         except:
             print "Unexpected error in finding local ptp:", sys.exc_info()
         if len(ptpList)!=0:
@@ -289,7 +293,7 @@ class dataSample:
             if self.debug==1:
                 print((baseline,baseStd,start,tmpStop,stimMean,"baseline,baseStd,start,tmpStop,stimMean"))
             try:
-                sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
+                sample=signal.medfilt(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
             except:
                 sample=data[tmpStop-int(self.stimulyDuration/40):tmpStop+self.defaultFrame+int(self.stimulyDuration/40)]
             firstArray=abs(diff(sample))<=baseStd
@@ -349,16 +353,17 @@ class dataSample:
             return data
 
     def mainLevelFinding(self):
+        if self.debug==1:
+            print("self.snr",self.snr)
         self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.4)#
         if self.debug==1:
-            print("self.mainLevel,self.snr",self.mainLevel,self.snr)    
+            print("self.mainLevel:",self.mainLevel)    
 
-    def filtering(self):        
+    def filtering(self,coeffTreshold):        
         self.coeffs=pywt.swt(self.cleanData, self.wavelet, level=self.mainLevel+1)
         self.coefsBeforeF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         for i in range(len(self.coeffs)):
             cA, cD = self.coeffs[i]
-            cDbk = cD
             if i>=(len(self.coeffs)-self.highNoiseLevel):
                 cD=zeros(len(cA),dtype='float32')
                 if self.debug==1:
@@ -367,17 +372,20 @@ class dataSample:
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
                 maxSD=self.getLocalPtp(cD[self.deltaLen:],self.defaultFrame*0.8)
                 snr=maxSD/minSD
-                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold*(sqrt(sqrt(snr))+i)+i**2))
+                cD=pywt.thresholding.soft(cD,minSD*(coeffTreshold*(sqrt(sqrt(snr))+i)+i**2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
-        self.result=iswt(self.coeffs,self.wavelet)   
+        return iswt(self.coeffs,self.wavelet)   
 
     def spikeFinding(self):
+        resultDataForSearch=self.resultRough
         resultData=self.result
         start=self.defaultFrame/4
         stop=-self.defaultFrame/4
-        minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
-        maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
+        minimum,minimumValue = extrema(resultDataForSearch[start:stop],_max = False, _min = True, strict = False, withend = True)
+        maximum,maximumValue = extrema(resultDataForSearch[start:stop],_max = True, _min = False, strict = False, withend = True)
+        minimumValue=[resultData[i] for i in minimum]
+        maximumValue=[resultData[i] for i in maximum]
         tmpMaximum=maximum.tolist()
         tmpMaximum.extend(array(self.stimuli[1])-start)
         maximum=array(tmpMaximum)
@@ -658,8 +666,12 @@ class dataSample:
         in the case when fibre potential didn`t find 
         """
         i=0
-        while(sample[stop-i]>sample[stop-i-1]):
-            i+=1
+        if sample[stop]<sample[stop-1]:
+            while(sample[stop-i]<sample[stop-i-1]):
+                i+=1
+        else:       
+            while(sample[stop-i]>=sample[stop-i-1]):
+                i+=1
         return i
     
     def calculateEpilept(self,sample2,xr1):
