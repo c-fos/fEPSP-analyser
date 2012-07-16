@@ -68,7 +68,7 @@ class dataSample:
             self.hardError=1
         try:
             self.resultRough=self.filtering(self.coeffTreshold)
-            self.result=self.filtering(self.coeffTreshold-2)
+            self.result=self.filtering(self.coeffTreshold-3)
         except:
             print "filtering() error:", sys.exc_info()
             self.hardError=1
@@ -128,7 +128,7 @@ class dataSample:
         self.wavelet='sym3'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-        self.coeffTreshold = int(self.arguments[4])+3#4
+        self.coeffTreshold = int(self.arguments[4])+5#4
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -384,15 +384,14 @@ class dataSample:
         stop=-self.defaultFrame/4
         minimum,minimumValue = extrema(resultDataForSearch[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultDataForSearch[start:stop],_max = True, _min = False, strict = False, withend = True)
-        minimumValue=[resultData[i] for i in minimum]
-        maximumValue=[resultData[i] for i in maximum]
+        minimumValue=resultData[minimum+start]
         tmpMaximum=maximum.tolist()
         tmpMaximum.extend(array(self.stimuli[1])-start)
         maximum=array(tmpMaximum)
         maximum.sort()
         maximumValue=resultData[maximum+start]
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=float16(std+std*sqrt(sqrt(self.snr))/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
+        SD=float16(std+std*self.snr**(1/4)/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
@@ -502,6 +501,9 @@ class dataSample:
      
             
     def responsLength(self):
+        """
+        The function for calculation the response length - the distance between the stimuli and the moment of potential returning to baseline 
+        """
         responsMatrix=zeros((max(self.clusters),2),dtype=int)#[[start1,stop1],[start2,stop2]]
         length=len(self.result)
         smallFrame=self.defaultFrame/10
@@ -514,6 +516,10 @@ class dataSample:
             except:
                 lastSpike=self.spikeDict.values()[-1]
             if self.isClusterOn==1:
+                """
+                The case when distinct responses are separated by clusterization method rather then stimuli
+                This mean that response start search starts from the first max of the first spike
+                """
                 tmpObject=getattr(self,firstSpike)
                 firstMax=tmpObject.spikeMax1
                 k=firstMax
@@ -530,6 +536,10 @@ class dataSample:
                 stop=k
                 responsMatrix[i-1]=start,stop
             else:
+                """
+                The case when distinct responses are separated by electrical stimuli search
+                This mean that the response starts from electrical artifact
+                """
                 start=self.stimuli[0][i-1]
                 baseLevel=self.result[start-smallFrame*2:start].mean()
                 tmpObject=getattr(self,lastSpike)
@@ -553,9 +563,23 @@ class dataSample:
                                 break
                         
                 stop=k
+                """
+                Shift the response end to left for long tail preventing
+                """
+                difference=self.result[lastMax]-self.result[stop]
+                threshold=self.result[lastMax]-0.9*difference
+                if difference>0:                    
+                    while self.result[stop]<threshold:
+                        stop-=1
+                if difference<0:
+                    while self.result[stop]>threshold:
+                        stop-=1
                 if self.debug==1:
                     print((lastMax,stop,length,"lastMax,stop,length"))
                 try:
+                    """
+                    Calculate response end precisely using polynomial smoothing 
+                    """
                     sampleLen=stop-lastMax
                     if self.debug==1:
                         print(("respons end sample length:",sampleLen))
