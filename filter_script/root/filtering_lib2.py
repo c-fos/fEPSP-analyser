@@ -53,6 +53,14 @@ class dataSample:
             self.hardError=1
         try:
             self.cleanData=self.cutStimuli(self.data)
+            if self.debug==1:        
+                fig, ax = plt.subplots(1, 1)
+                ax.grid(color='k', linestyle='-', linewidth=0.4)
+                ax.plot(self.data)
+                #ax.plot(self.cleanData,'g')       
+                plt.show()   
+                plt.close()# very important to stop memory leak
+                del fig,ax
         except:
             print "cutStimuli() error:", sys.exc_info()
             self.hardError=1
@@ -68,7 +76,7 @@ class dataSample:
             self.hardError=1
         try:
             self.resultRough=self.filtering(self.coeffTreshold)
-            self.result=self.filtering(self.coeffTreshold-3)
+            self.result=self.filtering(self.coeffTreshold-5)
         except:
             print "filtering() error:", sys.exc_info()
             self.hardError=1
@@ -128,7 +136,7 @@ class dataSample:
         self.wavelet='sym3'#'bior3.5
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-        self.coeffTreshold = int(self.arguments[4])+5#4
+        self.coeffTreshold = int(self.arguments[4])+7#4
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -369,10 +377,19 @@ class dataSample:
                 if self.debug==1:
                     print(("noisLevel",i))
             else:
+                if self.debug==1:        
+                    fig, ax = plt.subplots(1, 1)
+                    ax.grid(color='k', linestyle='-', linewidth=0.4)
+                    ax.plot(cD)       
+                    plt.show()   
+                    plt.close()# very important to stop memory leak
+                    del fig,ax
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
                 maxSD=self.getLocalPtp(cD[self.deltaLen:],self.defaultFrame*0.8)
                 snr=maxSD/minSD
-                cD=pywt.thresholding.soft(cD,minSD*(coeffTreshold*(sqrt(sqrt(snr))+i)+i**2))
+                if self.debug==1:
+                    print(minSD,maxSD,snr,i,minSD*(coeffTreshold*(snr**(i**(0.7)/(i**(1.5)+i+1)))+i*2))
+                cD=pywt.thresholding.soft(cD,minSD*(coeffTreshold*(snr**(i**(0.7)/(i**(1.5)+i+1)))+i*2))
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         return iswt(self.coeffs,self.wavelet)   
@@ -390,6 +407,25 @@ class dataSample:
         maximum=array(tmpMaximum)
         maximum.sort()
         maximumValue=resultData[maximum+start]
+        if self.debug==1:        
+            fig, ax = plt.subplots(1, 1)
+            ax.grid(color='k', linestyle='-', linewidth=0.4)
+            ax.plot(resultDataForSearch[start:stop],'b')
+            for i in range(len(minimum)):
+                ax.axvline(x=minimum[i],color='g')
+            for i in range(len(maximum)):
+                ax.axvline(x=maximum[i],color='r')
+            plt.show()   
+            plt.close()# very important to stop memory leak
+            del fig,ax
+        if self.debug==1:        
+            fig, ax = plt.subplots(1, 1)
+            ax.grid(color='k', linestyle='-', linewidth=0.4)
+            ax.plot(resultDataForSearch,'b')
+            ax.plot(resultData,'g')
+            plt.show()   
+            plt.close()# very important to stop memory leak
+            del fig,ax
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
         SD=float16(std+std*self.snr**(1/4)/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
@@ -626,7 +662,7 @@ class dataSample:
         if(tmpObject.fibre==1):
             #mask[0]=1
             mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-            mask[(tmpObject2.spikeMax1+tmpObject2.spikeMax2)/2-tmpObject.responseStart]=1
+            mask[(tmpObject2.spikeMin+tmpObject2.spikeMax2)/2-tmpObject.responseStart]=1
             epspStart=tmpObject2.spikeMin-tmpObject.responseStart
             mask[epspStart]=1
         else:
@@ -871,7 +907,7 @@ class dataSample:
             self.hardError=1
          
         if self.debug==1:
-            #    ax.locator_params(nbins=3)
+            ax.locator_params(nbins=3)
             bx = axes_list[1]
             bx.set(xlabel="x-label", ylabel="y-label", title="before filtering")
             #print self.coefsBeforeF.shape
@@ -899,6 +935,43 @@ class dataSample:
         
         del fig
         
+        if self.debug==1:        
+                fig, ax = plt.subplots(1, 1)
+                ax.grid(color='k', linestyle='-', linewidth=0.4)
+                ax.plot(self.result,'b')       
+                plt.show()   
+                plt.close()# very important to stop memory leak
+                del fig,ax
+        if self.debug==1:        
+                fig, ax = plt.subplots(1, 1)
+                ax.grid(color='k', linestyle='-', linewidth=0.4)
+                ax.plot(self.cleanData,'y')
+                ax.plot(self.result,'b')       
+                plt.show()   
+                plt.close()# very important to stop memory leak
+                del fig,ax
+        if self.debug==1:        
+                fig, ax = plt.subplots(1, 1)
+                ax.grid(color='k', linestyle='-', linewidth=0.4)
+                ax.plot(self.result,'b')
+                try:
+                    for i in self.responseDict.values():
+                        tmpObject=getattr(self,i)
+                        try:
+                            for j in tmpObject.spikes:
+                                tmpObject2=getattr(self,j)
+                                ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
+                                ax.plot(tmpObject2.spikeMax1,self.result[tmpObject2.spikeMax1],'og')
+                                ax.plot(tmpObject2.spikeMax2,self.result[tmpObject2.spikeMax2],'og')
+                        except:
+                            print "Unexpected error wile spike ploating:", sys.exc_info()
+                except:
+                    print "Unexpected error wile ploating:", sys.exc_info()
+                    self.hardError=1       
+                plt.show()   
+                plt.close()# very important to stop memory leak
+                del fig,ax
+        
     def writeData(self):
         if self.write:
             try:
@@ -922,7 +995,12 @@ class dataSample:
             
             
             
-            
-            
-            
-            
+    #===========================================================================
+    # if self.debug==1:        
+    #    fig, ax = plt.subplots(1, 1)
+    #    ax.grid(color='k', linestyle='-', linewidth=0.4)
+    #    ax.plot(self.cleanData,'y')       
+    #    plt.show()   
+    #    plt.close()# very important to stop memory leak
+    #    del fig
+    #===========================================================================
