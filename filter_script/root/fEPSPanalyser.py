@@ -39,6 +39,11 @@ import sys,pickle
 from dbAccess import Mysql_writer
 from filtering_lib2 import dataSample
 import shutil
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> refs/heads/Stable
 
 class fepspAnalyser:
     
@@ -73,7 +78,10 @@ class fepspAnalyser:
                     mysql_writer.filePath=i
                     mysql_writer.time = creatingTime
                     mysql_writer.dbWriteRecord()
+<<<<<<< HEAD
                     mysql_writer.dbWriteRecordTags(fileName)
+=======
+>>>>>>> refs/heads/Stable
                 dataSample1=dataSample(i,mysql_writer,arguments)
                 dataSample1.dataProcessing()
                 if dataSample1.hardError==1:

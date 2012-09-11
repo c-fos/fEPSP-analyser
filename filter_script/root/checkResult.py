@@ -5,6 +5,7 @@ Created on 15.02.2012
 
 This function is just simple placeholder.
 '''
+<<<<<<< HEAD
 import matplotlib.pyplot as plt
 import pywt
 import numpy
@@ -38,3 +39,14 @@ def resultAnalysis(parentObj,debug):
         bx.text(50,50, tex, fontsize=12, va='bottom')
         plt.show()
         del fig
+=======
+
+
+def resultAnalysis(parentObj):
+    if len(parentObj.responseDict)>=1:# and len(parentObj.epsp[0])==len(parentObj.responseDict):
+        print "Test passed succsessful"
+    else:
+        print "Test error"
+        parentObj.errorState=1
+    
+>>>>>>> refs/heads/Stable
