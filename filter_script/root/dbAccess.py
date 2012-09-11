@@ -16,18 +16,14 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-<<<<<<< HEAD
         self.rTagDict={"коф":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
         self.rTagMask=["до","перед","макс","отмыв"]
-=======
->>>>>>> refs/heads/Stable
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
         if len(tagList)>0:
             cursor = self.conn.cursor()
             for i in tagList:
-<<<<<<< HEAD
                 tagId = self.tagCheck(i,'tagTable','tagId')
                 cursor.execute("INSERT INTO experimentTags(experiment_idexperiment,tagTable_tagId)\
                              VALUES (%s,%s);", (self.idExperiment,tagId))
@@ -47,31 +43,6 @@ class Mysql_writer:
             self.conn.commit()
             cursor.execute("SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
             tagId = cursor.fetchone()[0]
-=======
-                tagId = self.tagCheck(i)
-                cursor.execute("INSERT INTO experimentTags(experiment_idexperiment,tagTable_tagId)\
-                             VALUES (%s,%s);", (self.idExperiment,tagId))
-            self.conn.commit()
-            cursor.close()   
-        
-
-    def tagCheck(self,tag):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT tagId \
-                             FROM tagTable \
-                             WHERE tagName='%s';" % tag)
-        try:
-            tagId = cursor.fetchall()[0][0]
-        except:
-            print "there are no '%s' tag" % tag, sys.exc_info()
-            cursor.execute("INSERT INTO tagTable(tagName)\
-                             VALUES ('%s');" % tag)
-            self.conn.commit()
-            cursor.execute("SELECT tagId \
-                             FROM tagTable \
-                             WHERE tagName='%s';" % tag)
-            tagId = cursor.fetchall()[0][0]
->>>>>>> refs/heads/Stable
         return tagId
                 
     def variables_global(self):
@@ -109,27 +80,17 @@ class Mysql_writer:
     def dbWriteExperiment(self):
         experimentName=str(self.filePath.split('/')[-2])
         cursor = self.conn.cursor()
-<<<<<<< HEAD
         cursor.execute("INSERT INTO experiment(date,experimentName)\
                              VALUES (%s,%s);", (self.date,experimentName))
-=======
-        cursor.execute("INSERT INTO experiment(date)\
-                             VALUES (%s);", (self.date))
->>>>>>> refs/heads/Stable
         self.conn.commit()
         cursor.execute("SELECT idexperiment \
                              FROM experiment \
                              ORDER BY idexperiment\
                              DESC LIMIT 1;")
-<<<<<<< HEAD
         self.idExperiment = cursor.fetchone()[0]
-=======
-        self.idExperiment = cursor.fetchall()[0][0]
->>>>>>> refs/heads/Stable
         cursor.close()
         
     def dbWriteRecord(self):
-<<<<<<< HEAD
         fileName=str(self.filePath.split('/')[-1])
         cursor = self.conn.cursor()
         cursor.execute("INSERT INTO record(filename,time,\
@@ -164,16 +125,6 @@ class Mysql_writer:
             self.conn.commit()
         cursor.close()
     
-=======
-        fileName="%s/%s" % (self.filePath.split('/')[-2],self.filePath.split('/')[-1])
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO record(filename,time,\
-                                            experiment_idexperiment)\
-                        VALUES(%s,%s,%s);", (fileName,self.time,str(self.idExperiment)))
-        self.conn.commit()
-        cursor.close() 
-
->>>>>>> refs/heads/Stable
     def dbWriteResponse(self,tmpObject):
         rNumber=tmpObject.responsNumber
         vpsp=tmpObject.vpsp
@@ -201,40 +152,15 @@ class Mysql_writer:
                              FROM record \
                              ORDER BY idrecord\
                              DESC LIMIT 1;")
-<<<<<<< HEAD
         self.idRecord = cursor.fetchone()[0]
         try:
             cursor.execute("INSERT INTO signalProperties(record_idrecord,ptp,snr,std,mainLevel)\
                              VALUES(%s,%s,%s,%s,%s)", (str(self.idRecord),str(ptp),str(snr),str(std),str(mainLevel)))
         except:
             pass
-=======
-        self.idRecord = cursor.fetchall()[0][0]
-        cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
-                             str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd)))
->>>>>>> refs/heads/Stable
         self.conn.commit()
         cursor.close()
         
-<<<<<<< HEAD
-=======
-    def dbWriteSignalProperties(self,ptp,snr,std,mainLevel):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT idrecord \
-                             FROM record \
-                             ORDER BY idrecord\
-                             DESC LIMIT 1;")
-        self.idRecord = cursor.fetchall()[0][0]
-        try:
-            cursor.execute("INSERT INTO signalProperties(record_idrecord,ptp,snr,std,mainLevel)\
-                             VALUES(%s,%s,%s,%s,%s)", (str(self.idRecord),str(ptp),str(snr),str(std),str(mainLevel)))
-        except:
-            pass
-        self.conn.commit()
-        cursor.close()
-        
->>>>>>> refs/heads/Stable
     def dbWriteError(self,soft,hard):
         cursor = self.conn.cursor()
         cursor.execute("UPDATE record\
@@ -246,7 +172,6 @@ class Mysql_writer:
     def dbWriteSpike(self,tmpObject):
         ampl=str(tmpObject.spikeAmpl)
         number=tmpObject.spikeNumber
-<<<<<<< HEAD
         sLength=str(tmpObject.spikeLength)#must be changed to length at 80% or something like that
         maxdiff=str(tmpObject.spikeMax2Val-tmpObject.spikeMax1Val)
         angle1=str(tmpObject.spikeFront)
@@ -254,10 +179,6 @@ class Mysql_writer:
         delay=str(tmpObject.spikeDelay)
         maxToMin=str(tmpObject.spikeMaxToMin)
         area=str(tmpObject.area)
-=======
-        sLength=tmpObject.spikeLength#must be changed to length at 80% or something like that
-        maxdiff=tmpObject.spikeMax2Val-tmpObject.spikeMax1Val
->>>>>>> refs/heads/Stable
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\

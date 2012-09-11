@@ -20,7 +20,6 @@ def addDir(path):
 if sys.argv[1]=="create_list" and len(sys.argv)==3:
     dir_list=glob(sys.argv[2]+"/*")
     dir_list2=[addDir(i) for i in dir_list]
-<<<<<<< HEAD
     #remove('.dir_list')
     with open('.dir_list', 'a') as f:
         [f.write(i) for i in dir_list2]
@@ -33,20 +32,6 @@ elif sys.argv[1]=="start" and len(sys.argv)==2:
         print tags,path
         try:
             analyserObject=fepspAnalyser([0,path,'200000',"data","1",tags,0,1,0])
-=======
-    remove('.dir_list')
-    with open('.dir_list', 'a') as f:
-        [f.write(i) for i in dir_list2]
-elif sys.argv[1]=="start" and len(sys.argv)==2:
-    with open('.dir_list', 'r') as f:
-        dir_list2=f.readlines()
-    for i in dir_list2:
-        path=i.split(' \'')[0].strip()
-        tags=i.split(' \'')[1].strip('\'\n').strip()
-        print tags,path
-        try:
-            analyserObject=fepspAnalyser([0,path,'20000',"data","1",tags,0,1,0])
->>>>>>> refs/heads/Stable
             del analyserObject
         except:
             print "fepspAnalyser error:", sys.exc_info()

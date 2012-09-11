@@ -8,27 +8,17 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-<<<<<<< HEAD
 from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
-=======
-from numpy import zeros, asmatrix, append, math, empty, sqrt, histogram, ones,ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
->>>>>>> refs/heads/Stable
 import pywt
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
 from scipy.interpolate import Rbf
-<<<<<<< HEAD
 from scipy import polyval, polyfit, signal
 from clussterization import clusterization, clusterAnalyser
 from checkResult import resultAnalysis
 import rInterface
-=======
-from scipy import polyval, polyfit
-from clussterization import clusterization, clusterAnalyser
-from checkResult import resultAnalysis
->>>>>>> refs/heads/Stable
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
@@ -136,29 +126,17 @@ class dataSample:
                     print "dbWriteError error:", sys.exc_info()
                     self.hardError=1
         try:
-<<<<<<< HEAD
             resultAnalysis(self,self.debug)
-=======
-            resultAnalysis(self)
->>>>>>> refs/heads/Stable
         except:
             print "resultAnalysis error:", sys.exc_info()
             self.hardError=1        
 
 
     def argReading(self):
-<<<<<<< HEAD
         self.wavelet='sym3'#'bior3.5
-=======
-        self.wavelet='sym5'#'bior3.5
->>>>>>> refs/heads/Stable
         self.frequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
-<<<<<<< HEAD
         self.coeffTreshold = int(self.arguments[4])+7#4
-=======
-        self.coeffTreshold = int(self.arguments[4])+3
->>>>>>> refs/heads/Stable
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
@@ -182,16 +160,10 @@ class dataSample:
             return unique1
     
     def dataFitting(self,data,frequency):
-<<<<<<< HEAD
         dataLen=len(data)
         tmp=2**(math.ceil(math.log(dataLen,2)))
         self.deltaLen=tmp-dataLen
         meanTmp=self.histMean(data[:dataLen/4])
-=======
-        tmp=2**(math.ceil(math.log(len(data),2)))
-        self.deltaLen=tmp-len(data)
-        meanTmp=self.histMean(data)
->>>>>>> refs/heads/Stable
         newData=empty(tmp, dtype='float32')
         newData.fill(meanTmp)
         newData[self.deltaLen:]=data
@@ -202,11 +174,7 @@ class dataSample:
         self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equal to 4 msec
         self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
-<<<<<<< HEAD
         self.baseFrequency=300 #we must separate the levels of wavelet decomposition that contains most part of the signal
-=======
-        self.baseFrequency=300 #we must separate the levels of wavelet decomposition wich contains most part of the signal
->>>>>>> refs/heads/Stable
         highNoiseFrequency=14000.0
         self.highNoiseLevel=int((math.log(highNoiseFrequency/self.frequency,0.5)))
         self.localDelay=1*msec #time delay before spike(filtering of local responses)
@@ -245,7 +213,6 @@ class dataSample:
                 return data.std()  
             
     def snrFinding(self,data,frameSize):
-<<<<<<< HEAD
         if self.debug==1:
             print((data,len(data),frameSize,"data,len(data),framesize"))
         minSD=self.stdFinder(data,frameSize)
@@ -271,24 +238,12 @@ class dataSample:
             return max(ptpList)
         else:
             return 0
-=======
-        minSD=self.stdFinder(data,frameSize)
-        maxSD=ptp(data)
-        snr=float16(maxSD/minSD)
-        self.signalPtp=maxSD
-        self.signalStd=data.std()
-        if self.debug==1:
-            print((minSD,maxSD,snr,"minSD,maxSD,snr in snrFinding function"))
-        return snr     
-
->>>>>>> refs/heads/Stable
 
     def findStimuli(self,data):
         wavelet='haar'
         filterSize=pywt.Wavelet(wavelet).dec_len
         pwr=pywt.swt(data, wavelet, 2)
         pwr2=array(pwr[0][1])
-<<<<<<< HEAD
         pwr4Std=self.stdFinder(pwr2[self.deltaLen:], self.defaultFrame)
         pwr4ptp=pwr2.ptp()
         treshold=pwr4Std*1.5*log(pwr4ptp/pwr4Std)#11 - empirical finding coef         
@@ -301,27 +256,11 @@ class dataSample:
         self.HiFrequNoise2=pwr5
         self.HiFrequNoise1=pwr2
         dpwr=where((diff(pwr5)==treshold)==True)[0]
-=======
-        pwr3=pywt.swt(pwr2, wavelet, 2)
-        pwr4S=abs(array(pwr3[0][1]))
-        self.HiFrequNoise1=pwr2
-        self.HiFrequNoise2=pwr4S
-        pwr4Std=self.stdFinder(pwr4S[self.deltaLen:], self.defaultFrame)
-        treshold=pwr4Std*11#11 - empirical finding koef         
-        self.stimTreshold=treshold
-        pwr5=zeros(len(pwr4S))
-        pwr5[1:]+=abs(diff(pwr4S))
-        pwr5[0]=pwr5[1]
-        pwr5[pwr5<treshold]=0
-        pwr5[pwr5>0]=treshold
-        dpwr=where((diff(pwr5)>treshold/2)==True)[0]
->>>>>>> refs/heads/Stable
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
             if dpwr[i+1]-dpwr[i]<self.stimulyDuration/4.0:
                 dpwrMask[i+1]=0
         dpwr=dpwr[dpwrMask]
-<<<<<<< HEAD
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)):
             length1=len(where((abs(diff(pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/4]))>=treshold)==True)[0])
@@ -343,8 +282,6 @@ class dataSample:
             else:
                 dpwrMask[i]=0
         dpwr=dpwr[dpwrMask]
-=======
->>>>>>> refs/heads/Stable
         if self.debug==1:
                 print("number of finded stimuls - %s" % len(dpwr))          
         stimList=[[],[]]
@@ -362,25 +299,13 @@ class dataSample:
                 tmpStop=len(data)-self.defaultFrame-5
             stimMean=data[start:tmpStop].mean()
             if self.debug==1:
-<<<<<<< HEAD
                 print((baseline,baseStd,start,tmpStop,stimMean,"baseline,baseStd,start,tmpStop,stimMean"))
-=======
-                print((baseline,baseStd,stimMean,"baseline,baseStd,stimMean"))
->>>>>>> refs/heads/Stable
             try:
-<<<<<<< HEAD
                 sample=signal.medfilt(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
-=======
-                sample=smooth(data[tmpStop-5:tmpStop+self.defaultFrame+5],int(self.stimulyDuration/20))
->>>>>>> refs/heads/Stable
             except:
                 sample=data[tmpStop-int(self.stimulyDuration/40):tmpStop+self.defaultFrame+int(self.stimulyDuration/40)]
             firstArray=abs(diff(sample))<=baseStd
             secondArray=abs(sample[1:]-baseline)<baseStd/2
-<<<<<<< HEAD
-=======
-            #thirdArray=abs(sample[1:]-baseline)<abs(baseline-stimMean)/20
->>>>>>> refs/heads/Stable
             fourthArray=self.stdArray(sample[1:],5)<=baseStd*3
             fivthArray=abs(sample[1:]-baseline)<baseStd*4
             if self.debug==1:
@@ -403,7 +328,6 @@ class dataSample:
         self.stimuli=stimList
 
     def stdArray(self,sample,frame):
-<<<<<<< HEAD
         test=empty(len(sample)+frame*2)
         result=empty(len(sample))
         test[frame:-frame]=sample
@@ -411,17 +335,6 @@ class dataSample:
         test[-frame:]=sample[-frame:]
         for i in range(len(sample)):
             result[i]=test[i:i+frame*2].std()
-=======
-        print("stdArray")
-        test=empty(len(sample)+frame*2)
-        result=empty(len(sample))
-        test[frame:-frame]=sample
-        test[:frame]=sample[:frame]
-        test[-frame:]=sample[-frame:]
-        for i in range(len(sample)):
-            result[i]=test[i:i+frame*2].std()
-        print(len(sample),len(result),"len(sample),len(result)")
->>>>>>> refs/heads/Stable
         return result
 
     def cutStimuli(self,data):
@@ -448,34 +361,22 @@ class dataSample:
             return data
 
     def mainLevelFinding(self):
-        self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-0.7)#
         if self.debug==1:
-<<<<<<< HEAD
             print("self.snr",self.snr)
         self.mainLevel=int(math.log((self.baseFrequency*(1/2+sqrt(sqrt(self.snr))/2))/self.frequency,0.5)-1.4)#
         if self.debug==1:
             print("self.mainLevel:",self.mainLevel)    
-=======
-            print("self.mainLevel,self.snr",self.mainLevel,self.snr)
-    
->>>>>>> refs/heads/Stable
 
-<<<<<<< HEAD
     def filtering(self,coeffTreshold):        
-=======
-    def filtering(self):        
->>>>>>> refs/heads/Stable
         self.coeffs=pywt.swt(self.cleanData, self.wavelet, level=self.mainLevel+1)
         self.coefsBeforeF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
         for i in range(len(self.coeffs)):
             cA, cD = self.coeffs[i]
-            cDbk = cD
             if i>=(len(self.coeffs)-self.highNoiseLevel):
                 cD=zeros(len(cA),dtype='float32')
                 if self.debug==1:
                     print(("noisLevel",i))
             else:
-<<<<<<< HEAD
                 if self.debug==1:        
                     fig, ax = plt.subplots(1, 1)
                     ax.grid(color='k', linestyle='-', linewidth=0.4)
@@ -489,25 +390,15 @@ class dataSample:
                 if self.debug==1:
                     print(minSD,maxSD,snr,i,minSD*(coeffTreshold*(snr**(i**(0.7)/(i**(1.5)+i+1)))+i*2))
                 cD=pywt.thresholding.soft(cD,minSD*(coeffTreshold*(snr**(i**(0.7)/(i**(1.5)+i+1)))+i*2))
-=======
-                minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
-                cD=pywt.thresholding.soft(cD,minSD*(self.coeffTreshold+i**2))
->>>>>>> refs/heads/Stable
             self.coeffs[i]=cA, cD
         self.coefsAfterF=asmatrix([self.coeffs[i][1] for i in range(len(self.coeffs))])
-<<<<<<< HEAD
         return iswt(self.coeffs,self.wavelet)   
-=======
-        self.result=iswt(self.coeffs,self.wavelet)
-   
->>>>>>> refs/heads/Stable
 
     def spikeFinding(self):
         resultDataForSearch=self.resultRough
         resultData=self.result
         start=self.defaultFrame/4
         stop=-self.defaultFrame/4
-<<<<<<< HEAD
         minimum,minimumValue = extrema(resultDataForSearch[start:stop],_max = False, _min = True, strict = False, withend = True)
         maximum,maximumValue = extrema(resultDataForSearch[start:stop],_max = True, _min = False, strict = False, withend = True)
         minimumValue=resultData[minimum+start]
@@ -537,12 +428,6 @@ class dataSample:
             del fig,ax
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
         SD=float16(std+std*self.snr**(1/4)/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
-=======
-        minimum,minimumValue = extrema(resultData[start:stop],_max = False, _min = True, strict = False, withend = True)
-        maximum,maximumValue = extrema(resultData[start:stop],_max = True, _min = False, strict = False, withend = True)
-        std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
-        SD=float16(std+std*sqrt(sqrt(self.snr))/2)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
->>>>>>> refs/heads/Stable
         if self.debug==1:
             print ((self.snr,std,SD,"self.snr,std,SD"))
         spikePoints=[]
@@ -561,7 +446,6 @@ class dataSample:
              and (maximum[tmpMaximum2]-maximum[tmpMaximum1])>self.stimulyDuration/2:
                 spikePoints.append([start+maximum[tmpMaximum1],start+minimum[i],start+maximum[tmpMaximum2]])
         for i in range(len(spikePoints)):
-<<<<<<< HEAD
             try:
                 ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+\
                        (resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/\
@@ -589,30 +473,8 @@ class dataSample:
                     tmpObject.spikeFront,tmpObject.spikeBack=self.getSpikeAngles(resultData[spikePoints[i][0]:spikePoints[i][2]])
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
-=======
-            ampl=round(resultData[spikePoints[i][0]]-resultData[spikePoints[i][1]]+(resultData[spikePoints[i][2]]-resultData[spikePoints[i][0]])/(spikePoints[i][2]-spikePoints[i][0])*(spikePoints[i][1]-spikePoints[i][0]),1)
-            if self.debug==1:
-                print(("Len of SpikePoints=%s,Spike %s, ampl=%s,SD=%s" % (len(spikePoints),i,ampl,SD)))
-            if ampl>SD:
-                index=len(self.spikeDict)
-                self.spikeDict[index]="n"+str(i)
-                setattr(self,self.spikeDict[index],Spike(self.frequency))
-                tmpObject=getattr(self,self.spikeDict[index])                
-                tmpObject.responseStart=start
-                tmpObject.responseEnd=stop
-                tmpObject.spikeNumber=i
-                tmpObject.spikeMax1=spikePoints[i][0]
-                tmpObject.spikeMax1Val=self.result[spikePoints[i][0]]
-                tmpObject.spikeMin=spikePoints[i][1]
-                tmpObject.spikeMinVal=self.result[spikePoints[i][1]]
-                tmpObject.spikeMax2=spikePoints[i][2]
-                tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
-                tmpObject.spikeAmpl=ampl
-                tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
->>>>>>> refs/heads/Stable
         if self.debug==1:
             print((self.fileName,self.spikeDict))
-<<<<<<< HEAD
         
     def checkForFibrePotential(self,spikeList):
         tmpObject = getattr(self,spikeList[0])#this computation writing as distinct function because i will add more filters later
@@ -651,8 +513,6 @@ class dataSample:
         else:
             angle2 = sample[point4]-sample[point3]
         return angle1,-angle2
-=======
->>>>>>> refs/heads/Stable
             
     def getSpikeLength(self,max1,min1,max2):
         h1=self.result[max1]-self.result[min1]
@@ -668,11 +528,7 @@ class dataSample:
                 secondPoint=where(self.result[min1:max2]>h2Part)[0]
             except:
                 firstPoint=(min1-max1)/2
-<<<<<<< HEAD
                 secondPoint=(max2-min1)/2
-=======
-                secondPoit=(max2-min1)/2
->>>>>>> refs/heads/Stable
         length=(secondPoint+(min1-(max1+firstPoint)))*2
         if self.debug==1:
             print "spike lendth finding"
@@ -743,7 +599,6 @@ class dataSample:
                                 break
                         
                 stop=k
-<<<<<<< HEAD
                 """
                 Shift the response end to left for long tail preventing
                 """
@@ -761,11 +616,6 @@ class dataSample:
                     """
                     Calculate response end precisely using polynomial smoothing 
                     """
-=======
-                if self.debug==1:
-                    print((lastMax,stop,length,"lastMax,stop,length"))
-                try:
->>>>>>> refs/heads/Stable
                     sampleLen=stop-lastMax
                     if self.debug==1:
                         print(("respons end sample length:",sampleLen))
@@ -799,7 +649,6 @@ class dataSample:
         return responsMatrix
     
     def epspReconstructor(self,tmpObject):
-<<<<<<< HEAD
         """
         The function for reconstructing shape of the inverted fEPSP
         Where:
@@ -906,69 +755,6 @@ class dataSample:
         ampl1=maxvalue-minvalue1
         ampl2=maxvalue-minvalue2
         #computation
-=======
-        tmpObject2=getattr(self,tmpObject.spikes[-1])
-        sample1=self.result[tmpObject.responseStart:tmpObject2.spikeMax2]     
-        mask=zeros(tmpObject.responseEnd-tmpObject.responseStart,dtype='bool')
-        tmpObject2=getattr(self,tmpObject.spikes[0])
-        mask[0]=1
-        mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-        mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
-        mask[(tmpObject2.spikeMax1-tmpObject.responseStart)/2]=1
-        if len(tmpObject.spikes)>=2:
-            try:
-                tmpObject2=getattr(self,tmpObject.spikes[1])
-                mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
-                mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
-            except:
-                print "there is no second spike?:", sys.exc_info()
-        tmpObject2=getattr(self,tmpObject.spikes[-1])
-        sample2=self.result[tmpObject2.spikeMax2:tmpObject.responseEnd]
-        sample2Points=array(range(len(sample2)))
-        if len(sample2Points)>301:
-            ar1=Rbf(sample2Points[sample2Points%100==0],sample2[sample2Points%100==0],smooth=0.01)#,function='gaussian')
-        else:
-            ar1=Rbf(sample2Points[sample2Points%10==0],sample2[sample2Points%10==0],smooth=0.01)
-        xr1=ar1(sample2Points)
-        self.epileptStd=self.calculateEpilept(sample2,xr1)
-        step=len(sample2Points)/8
-        for i in range(8):
-            mask[tmpObject2.spikeMax2-tmpObject.responseStart+step*i]=1
-        mask[-1]=1
-        sample=append(sample1,xr1)
-        if self.debug==1:
-            print((len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd]),"len(mask),len(sample),len(self.result[tmpObject.responseStart:tmpObject.responseEnd])"))
-        timePoints=where(mask==True)[0]
-        values=sample[mask]
-        sample3=array(range(len(sample)))
-        try:           
-            sp3 = Rbf(timePoints,int16(values),smooth=1,function='thin_plate')
-            y4=sp3(sample3)
-            try:
-                front,back = self.epspAnaliser(y4)
-                self.epsp=append(self.epsp,[sample3+tmpObject.responseStart,y4],axis=1)
-                if self.debug==1:
-                    print((front,back,"front,back"))
-                return front,back
-            except:
-                print "Unexpected error in epspAnaliser:", sys.exc_info()
-                return 0,0      
-        except:
-            print "Unexpected error in reconstruction:", sys.exc_info()
-            return 0,0
-        
-    def calculateEpilept(self,sample2,xr1):
-        diffSample=sample2-xr1
-        return diffSample.std()
-        
-    def epspAnaliser(self,y):
-        maxvalue=max(y)
-        maxPoint=where(y==maxvalue)[0]
-        minvalue1=min(y[:maxPoint])
-        minvalue2=min(y[maxPoint:])
-        ampl1=maxvalue-minvalue1
-        ampl2=maxvalue-minvalue2
->>>>>>> refs/heads/Stable
         firstPoint=where(y[:maxPoint]>minvalue1+ampl1*0.2)[0][0]
         firstValue=y[firstPoint]
         secondPoint=where(y[:maxPoint]>minvalue1+ampl1*0.8)[0][0]
@@ -997,16 +783,12 @@ class dataSample:
         """
         rMatrix=self.responsMatrix
         self.epsp=array([[],[]])
-<<<<<<< HEAD
         epspAreaStart=0
-=======
->>>>>>> refs/heads/Stable
         for i in unique(self.clusters):
             index=len(self.responseDict)
             self.responseDict[index]="r"+str(i)
             setattr(self,self.responseDict[index],Response())
             tmpObject=getattr(self,self.responseDict[index])
-<<<<<<< HEAD
             try:
                 tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
             except:
@@ -1029,27 +811,12 @@ class dataSample:
             try:
                 epspStartCorrection,tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
                 epspAreaStart,tmpObject.epspArea=self.Area(tmpObject,epspAreaStart,epspStartCorrection)
-=======
-            tmpObject.responseStart=rMatrix[i-1][0]
-            tmpObject.responseEnd=rMatrix[i-1][1]
-            tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-            tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-            tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
-            tmpObject.responsNumber=i
-            tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
-            tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
-            tmpObject.epspFront=0
-            tmpObject.epspBack=0            
-            try:
-                tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
->>>>>>> refs/heads/Stable
                 tmpObject.epspEpileptStd=self.epileptStd
             except:
                 print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
                 self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
         
-<<<<<<< HEAD
     def Area(self,tmpObject,epspAreaStart,epspStartCorrection):
         start=tmpObject.responseStart
         stop=tmpObject.responseEnd
@@ -1076,54 +843,10 @@ class dataSample:
         h1Part=h1*0.2#20% of first spike front
         h2=sample[-1]-max(sample)
         h2Part=h2*0.2
-=======
-
-    def plotData(self):
-        #fig = plt.figure()
-        #ax = fig.add_subplot(111)
-        if self.debug==1:
-            fig, axes_list = plt.subplots(3, 1, sharex=True)
-            ax = axes_list[0]
-        else:
-            fig, ax = plt.subplots(1, 1)
-        ax.plot(self.data,'y')
->>>>>>> refs/heads/Stable
         try:
-<<<<<<< HEAD
             firstPoint=where(sample>h1Part)[0][0]        
             secondPoint=where(sample.revers()>h2Part)[0][0]
-=======
-            ax.plot(self.result,'b')
-            try:
-                ax.plot(self.epsp[0],self.epsp[1],'r')
-            except:
-                self.softError=1
-            ax.grid(color='k', linestyle='-', linewidth=0.4)
-            try:
-                for i in self.responseDict.values():
-                    tmpObject=getattr(self,i)
-                    rect = Rectangle((tmpObject.responseStart, tmpObject.response_bottom), tmpObject.responseEnd-tmpObject.responseStart, tmpObject.response_top-tmpObject.response_bottom, facecolor="#aaaaaa", alpha=0.3)
-                    ax.add_patch(rect)
-                    ax.text(tmpObject.responseStart,tmpObject.response_top+20, "VPSP="+str(tmpObject.vpsp), fontsize=12, va='bottom')
-                    try:
-                        for j in tmpObject.spikes:
-                            tmpObject2=getattr(self,j)
-                            tex = str((tmpObject2.responsNumber,tmpObject2.spikeNumber,tmpObject2.spikeAmpl))
-                            ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
-                            ax.plot(tmpObject2.spikeMax1,self.result[tmpObject2.spikeMax1],'og')
-                            ax.plot(tmpObject2.spikeMax2,self.result[tmpObject2.spikeMax2],'og')
-                            ax.vlines(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin], self.result[tmpObject2.spikeMin]+tmpObject2.spikeAmpl, color='k', linestyles='dashed')
-                            ax.text(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin]-15, tex, fontsize=12, va='bottom')
-                    except:
-                        print "Unexpected error wile spike ploating:", sys.exc_info()
-            except:
-                print "Unexpected error wile ploating:", sys.exc_info()
-                self.hardError=1
-            for i in range(len(self.stimuli[0])):
-                ax.axvline(x=self.stimuli[0][i],color='g')
->>>>>>> refs/heads/Stable
         except:
-<<<<<<< HEAD
             try:
                 firstPoint=where(sample>h1Part)[0]        
                 secondPoint=where(sample.revers()>h2Part)[0]
@@ -1203,30 +926,6 @@ class dataSample:
             #
             #fig2, ax2 = plt.subplots(1, 1)
             #ax2.plot(self.data,'y')
-=======
-            print "Unexpected error wile ploating computedData:", sys.exc_info()
-            self.hardError=1
-         
-        if self.debug==1:
-            #    ax.locator_params(nbins=3)
-            bx = axes_list[1]
-            bx.set(xlabel="x-label", ylabel="y-label", title="before filtering")
-            #print self.coefsBeforeF.shape
-            normMatrixBefore=self.coefsBeforeF[:3]/sqrt(self.coefsBeforeF[:3].var())
-            bx.imshow(normMatrixBefore, aspect='auto')
-            #print(self.coefsBeforeF.size())
-            cx = axes_list[2]
-            cx.set(xlabel="x-label", ylabel="y-label", title="hiFrequNoise")
-            normMatrixAfter=self.coefsAfterF[:3]/sqrt(self.coefsAfterF[:3].var())
-            #cx.imshow(normMatrixAfter, aspect='auto')
-            cx.plot(abs(diff(self.HiFrequNoise1)),'g')
-            cx.plot(abs(diff(self.HiFrequNoise2)),'b')
-            cx.axhline(self.stimTreshold)
-            plt.tight_layout()
-            #
-            fig2, ax2 = plt.subplots(1, 1)
-            ax2.plot(self.data,'y')
->>>>>>> refs/heads/Stable
             #
             plt.show()
         else:
@@ -1275,7 +974,6 @@ class dataSample:
         
     def writeData(self):
         if self.write:
-<<<<<<< HEAD
             try:
                 self.mysql_writer.dbWriteSignalProperties(self.signalPtp,self.snr,self.signalStd,self.mainLevel) 
             except:
@@ -1284,13 +982,9 @@ class dataSample:
                 self.mysql_writer.dbWriteNumberOfResponses(len(self.responseDict.values()))
             except:
                 print "Unexpected error wile dbWriteNumberOfResponses:", sys.exc_info()
-=======
-            self.mysql_writer.dbWriteSignalProperties(self.signalPtp,self.snr,self.signalStd,self.mainLevel)
->>>>>>> refs/heads/Stable
             for i in self.responseDict.values():
                 tmpObject=getattr(self,i)
                 self.mysql_writer.dbWriteResponse(tmpObject)
-<<<<<<< HEAD
         
                 try:
                     for j in tmpObject.spikes:
@@ -1298,13 +992,6 @@ class dataSample:
                         self.mysql_writer.dbWriteSpike(tmpObject2)
                 except:
                     print "Unexpected error wile dbWriteSpike:", sys.exc_info()
-=======
-                for j in tmpObject.spikes:
-                    tmpObject2=getattr(self,j)
-                    self.mysql_writer.dbWriteSpike(tmpObject2)
-                #    del tmpObject2
-                #del tmpObject
->>>>>>> refs/heads/Stable
             
             
             
