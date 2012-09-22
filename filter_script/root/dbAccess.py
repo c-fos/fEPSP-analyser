@@ -8,6 +8,7 @@ Created on 05.12.2011
 from time import strftime,localtime
 from os import stat
 import sys,MySQLdb,pickle
+from models import *
 
 class Mysql_writer:
     
