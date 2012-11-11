@@ -179,14 +179,15 @@ class Mysql_writer:
         delay=str(tmpObject.spikeDelay)
         maxToMin=str(tmpObject.spikeMaxToMin)
         area=str(tmpObject.area)
+        fibre=str(tmpObject.fibre)
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\
                              ORDER BY idresponses\
                              DESC LIMIT 1;")
         idResponse = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin,area)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin,area))
+        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin,area,fibre)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin,area,fibre))
         self.conn.commit()
         cursor.close()
     def dbDisconnect(self):

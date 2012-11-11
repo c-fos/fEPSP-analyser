@@ -59,7 +59,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>debug</string>
+       <string>Debug</string>
       </property>
      </widget>
      <widget class="QWidget" name="layoutWidget">
@@ -85,7 +85,10 @@
        <item row="1" column="1">
         <widget class="QLabel" name="label_3">
          <property name="text">
-          <string>substance</string>
+          <string>Tags</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
          <property name="buddy">
           <cstring>substance_line</cstring>
@@ -95,7 +98,10 @@
        <item row="0" column="1">
         <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>frequency</string>
+          <string>Frequency</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
          <property name="buddy">
           <cstring>frequency_line</cstring>
@@ -114,7 +120,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>write to database</string>
+       <string>Write to database</string>
       </property>
       <property name="checked">
        <bool>true</bool>
@@ -130,7 +136,26 @@
        </rect>
       </property>
       <property name="text">
-       <string>replace clusterization by stimDetect</string>
+       <string>Replace clusterization by stimDetect</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="manualFibreSearchBox">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>230</y>
+        <width>241</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Manual fibre search</string>
+      </property>
+      <property name="checked">
+       <bool>false</bool>
       </property>
      </widget>
     </widget>
@@ -499,14 +524,14 @@
    <widget class="QLineEdit" name="pathLine">
     <property name="geometry">
      <rect>
-      <x>20</x>
+      <x>60</x>
       <y>30</y>
-      <width>941</width>
+      <width>901</width>
       <height>25</height>
      </rect>
     </property>
     <property name="text">
-     <string>data/</string>
+     <string>/media/</string>
     </property>
     <property name="maxLength">
      <number>32765</number>
@@ -519,13 +544,16 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>10</y>
-      <width>138</width>
-      <height>16</height>
+      <y>30</y>
+      <width>41</width>
+      <height>31</height>
      </rect>
     </property>
     <property name="text">
-     <string>Путь до директории:</string>
+     <string>Path:</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
     </property>
     <property name="buddy">
      <cstring>pathLine</cstring>
@@ -541,7 +569,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>выход</string>
+     <string>Exit</string>
     </property>
    </widget>
    <widget class="QPushButton" name="upButton">

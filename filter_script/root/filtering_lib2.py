@@ -8,9 +8,15 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32
+from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32,argmin
 import pywt
+import os    
+import tempfile
+os.environ['MPLCONFIGDIR'] = tempfile.mkdtemp()
+import matplotlib
+matplotlib.use('agg') 
 from matplotlib.patches import Rectangle
+from matplotlib.widgets import Cursor
 import matplotlib.pyplot as plt
 from externalFunctions import iswt,extrema,smooth
 from objects import Spike,Response
@@ -41,6 +47,10 @@ class dataSample:
             self.hardError=1
         if self.debug==1:
             print(self.fileName)
+        try:
+            self.frequency=self.freqLoad(self.fileName,self.defFrequency)
+        except:
+            print "self.freqLoad() error:", sys.exc_info()
         try:
             self.dataLoading()
         except:
@@ -134,12 +144,16 @@ class dataSample:
 
     def argReading(self):
         self.wavelet='sym3'#'bior3.5
-        self.frequency = int(self.arguments[2])
+        self.defFrequency = int(self.arguments[2])
         self.destination = str(self.arguments[3])
         self.coeffTreshold = int(self.arguments[4])+7#4
         self.debug = int(self.arguments[6])
         self.write = int(self.arguments[7])
         self.isClusterOn = int(self.arguments[8])
+        try:
+            self.manual = int(self.arguments[9])
+        except:
+            self.manual = 1
 
     def dataLoading(self):
         if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
@@ -148,6 +162,23 @@ class dataSample:
         else:
             data=fromfile(self.fileName,int16)
             self.data=self.dataFitting(data,self.frequency)
+    
+    def freqLoad(self,filename,defFrequ):
+        try:
+            dictionary=dict()
+            iniName=filename.strip('.dat')+".ins"
+            print(filename)
+            print(iniName)
+            fd=file(iniName,'r')
+            for line in fd.readlines():
+                pairs = line.split("=")
+                for variable, value in zip(pairs[::2],pairs[1::2]):
+                    dictionary[variable] = value.strip()
+            frequency=int(dictionary['CodingFreq'].strip())*1000
+        except:
+            print "freqLoad() error:", sys.exc_info()
+            frequency=defFrequ
+        return frequency
             
     def histMean(self,sample):
         unique1=unique(sample)
@@ -172,7 +203,7 @@ class dataSample:
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
         self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equal to 4 msec
-        self.stimulyDuration=int(1*msec) # treshold for stimuli filtering ~20points==2msec==2*self.msec
+        self.stimulyDuration=int(1*msec) #1msec# treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
         self.baseFrequency=300 #we must separate the levels of wavelet decomposition that contains most part of the signal
         highNoiseFrequency=14000.0
@@ -272,13 +303,14 @@ class dataSample:
             sampleStdDiff=sample3.std()/sample4.std()
             samplePtpDiff=abs(sample3).mean()/abs(sample4).mean()    
             if sampleStdDiff>2.0 and samplePtpDiff>2.0:
-                print(("len of stimulum",i,length1/(self.stimulyDuration/(self.frequency/16000.0)),self.stimulyDuration/(self.frequency/16000.0),sampleSumDiff,sampleStdDiff,samplePtpDiff))
-                if length1>=self.stimulyDuration/(self.frequency/16000.0):
+                print(("len of stimulum",i,dpwr[i]+filterSize,length1,length1/(self.stimulyDuration/(self.frequency/16000.0)),self.stimulyDuration/(self.frequency/16000.0),sampleSumDiff,sampleStdDiff,samplePtpDiff))
+                if length1>=self.stimulyDuration/12:
                     pass
                 elif sampleSumDiff>2 and length1>=self.stimulyDuration/(self.frequency/16000.0)/8:
                     pass
                 else:
                     dpwrMask[i]=0
+                    print("stimulum dropped")
             else:
                 dpwrMask[i]=0
         dpwr=dpwr[dpwrMask]
@@ -377,13 +409,13 @@ class dataSample:
                 if self.debug==1:
                     print(("noisLevel",i))
             else:
-                if self.debug==1:        
-                    fig, ax = plt.subplots(1, 1)
-                    ax.grid(color='k', linestyle='-', linewidth=0.4)
-                    ax.plot(cD)       
-                    plt.show()   
-                    plt.close()# very important to stop memory leak
-                    del fig,ax
+                #if self.debug==1:        
+                #    fig, ax = plt.subplots(1, 1)
+                #    ax.grid(color='k', linestyle='-', linewidth=0.4)
+                #    ax.plot(cD)       
+                #    plt.show()   
+                #    plt.close()# very important to stop memory leak
+                #    del fig,ax
                 minSD=self.stdFinder(cD[self.deltaLen:],self.defaultFrame)
                 maxSD=self.getLocalPtp(cD[self.deltaLen:],self.defaultFrame*0.8)
                 snr=maxSD/minSD
@@ -407,25 +439,27 @@ class dataSample:
         maximum=array(tmpMaximum)
         maximum.sort()
         maximumValue=resultData[maximum+start]
-        if self.debug==1:        
-            fig, ax = plt.subplots(1, 1)
-            ax.grid(color='k', linestyle='-', linewidth=0.4)
-            ax.plot(resultDataForSearch[start:stop],'b')
-            for i in range(len(minimum)):
-                ax.axvline(x=minimum[i],color='g')
-            for i in range(len(maximum)):
-                ax.axvline(x=maximum[i],color='r')
-            plt.show()   
-            plt.close()# very important to stop memory leak
-            del fig,ax
-        if self.debug==1:        
-            fig, ax = plt.subplots(1, 1)
-            ax.grid(color='k', linestyle='-', linewidth=0.4)
-            ax.plot(resultDataForSearch,'b')
-            ax.plot(resultData,'g')
-            plt.show()   
-            plt.close()# very important to stop memory leak
-            del fig,ax
+        #if self.debug==1:        
+            #fig, ax = plt.subplots(1, 1)
+            #ax.grid(color='k', linestyle='-', linewidth=0.4)
+            #ax.plot(resultDataForSearch[start:stop],'b')
+            #for i in range(len(minimum)):
+            #    ax.axvline(x=minimum[i],color='g')
+            #for i in range(len(maximum)):
+            #    ax.axvline(x=maximum[i],color='r')
+            #plt.show()   
+            #plt.close()# very important to stop memory leak
+            #del fig,ax
+        #=======================================================================
+        # if self.debug==1:        
+        #    fig, ax = plt.subplots(1, 1)
+        #    ax.grid(color='k', linestyle='-', linewidth=0.4)
+        #    ax.plot(resultDataForSearch,'b')
+        #    ax.plot(resultData,'g')
+        #    plt.show()   
+        #    plt.close()# very important to stop memory leak
+        #    del fig,ax
+        #=======================================================================
         std=self.stdFinder(self.cleanData[self.deltaLen:],self.defaultFrame)
         SD=float16(std+std*self.snr**(1/4)/4)#-5.0*self.coeffTreshold/self.snr))#? maybe we must add the snr check?
         if self.debug==1:
@@ -481,13 +515,83 @@ class dataSample:
         fibre=1
         if tmpObject.spikeNumber!=0:
             print("error in fibre potential check") 
-        if rInterface.neuroCheck(tmpObject.spikeMax2Val-tmpObject.spikeMax1Val,tmpObject.spikeLength,tmpObject.spikeFront,self.frequency/1000)>=0.5:
+        if rInterface.neuroCheck(tmpObject.spikeMax2Val-tmpObject.spikeMinVal,tmpObject.spikeLength,tmpObject.spikeFront,tmpObject.spikeBack,self.frequency/1000)>=0.5:
             fibre=0
             print("There are AP at zero position")
             for i in spikeList:
                 tmpObject = getattr(self,i)
                 tmpObject.spikeNumber=tmpObject.spikeNumber+1
-        return fibre,spikeList
+        return (fibre-1), spikeList
+    
+    def interactiveFibreSearch(self,spikeList,respDictValue):
+        try:
+            print(self.responseDict.values())
+            tmpObject=getattr(self,respDictValue)
+            tmpObject2=getattr(self,tmpObject.spikes[0])
+            start=tmpObject2.spikeMax1-(tmpObject2.spikeMin-tmpObject2.spikeMax1)
+            tmpObject2=getattr(self,tmpObject.spikes[-1])
+            stop=tmpObject2.spikeMax2+(tmpObject2.spikeMax2-tmpObject2.spikeMin)
+            fig, ax = plt.subplots(1, 1)
+            #self.overview=plt.subplot2grid((2,2),(0,0),rowspan=2,colspan=2)
+            ax.grid(color='k', linestyle='-', linewidth=0.4)
+            ax.plot(self.cleanData,'y')
+            ax.plot(self.result,'b')
+            ax.set_xlim((start,stop))
+            tmpObject=getattr(self,respDictValue)
+            try:
+                self.minimumsForFibre=[]
+                print(tmpObject.spikes)
+                for j in tmpObject.spikes:
+                    print(j)
+                    tmpObject2=getattr(self,j)
+                    ax.plot(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin],'or')
+                    ax.text(tmpObject2.spikeMin,self.result[tmpObject2.spikeMin]-15, str(j), fontsize=12, va='bottom')
+                    self.minimumsForFibre.append(tmpObject2.spikeMin)
+                          
+            except:
+                print "Unexpected error wile spike ploating:", sys.exc_info()
+            self.fibreIndex=''
+            cursor=Cursor(ax, useblit=True, color='black', linewidth=2 )
+            _widgets=[cursor]
+            fig.canvas.mpl_connect('button_press_event',self.click)
+            plt.show()   
+            # very important to stop memory leak
+            del fig,ax
+            if self.fibreIndex!='':
+                #print(tmpObject.spikes[self.fibreIndex])
+                print("Fibre spike: %s" % tmpObject.spikes[self.fibreIndex])
+            else:
+                print "O_o"
+            fibre=tmpObject.spikes[self.fibreIndex]#input()
+            if fibre=='':
+                pass
+            else:
+                tmpObject2=getattr(self,fibre)
+                tmpObject2.fibre=1
+        except:
+            print "Unexpected error wile ploating:", sys.exc_info()
+
+
+    def click(self,event):
+        """
+        What to do, if a click on the figure happens:
+            1. Check which axis
+            2. Get data coord's.
+            3. Plot resulting data.
+            4. Update Figure
+        """
+        #if event.inaxes==ax:
+        #Get nearest data
+        xpos=argmin(abs(event.xdata-self.minimumsForFibre))
+        #Check which mouse button:
+        if event.button==1:
+            #Plot it                
+            self.fibreIndex=xpos
+
+        elif event.button==3:
+            self.fibreIndex=''
+        #plt.draw()
+        plt.close()
         
     def getSpikeAngles(self,sample):
         sampleMin = min(sample)
@@ -658,8 +762,8 @@ class dataSample:
         sample1=self.result[tmpObject.responseStart:tmpObject2.spikeMax2]     
         mask=zeros(tmpObject.responseEnd-tmpObject.responseStart,dtype='bool')
         tmpObject2=getattr(self,tmpObject.spikes[0])
-        print(tmpObject.fibre)
-        if(tmpObject.fibre==1):
+        print("Is the first spike a fibre spike? : %s" % str(tmpObject2.fibre))
+        if(tmpObject2.fibre==1):
             #mask[0]=1
             mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
             mask[(tmpObject2.spikeMin+tmpObject2.spikeMax2)/2-tmpObject.responseStart]=1
@@ -790,7 +894,13 @@ class dataSample:
             setattr(self,self.responseDict[index],Response())
             tmpObject=getattr(self,self.responseDict[index])
             try:
-                tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
+                #tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
+                tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
+                if self.manual==1:
+                    self.interactiveFibreSearch(array(self.spikeDict.values())[self.clusters==i],self.responseDict[index])
+                else:
+                    pass
+                    #tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
             except:
                 print "Unexpected error wile checkForFibrePotential:", sys.exc_info()
             try:

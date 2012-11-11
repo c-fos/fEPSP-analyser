@@ -81,13 +81,18 @@ class MyForm(QtGui.QMainWindow):
             cluster="0"
         else:
             cluster="1"
+        
         if self.ui.database_checkBox.isChecked():
             write="1"
         else:
             write="0"
+        if self.ui.manualFibreSearchBox.isChecked():
+            manual="1"
+        else:
+            manual="0"
         if debug=="1":
             print((path,frequency,"data","1",substance,debug,write))
-        analyserObject=fepspAnalyser([0,path,frequency,"data","1",substance,debug,write,cluster])
+        analyserObject=fepspAnalyser([0,path,frequency,"data","1",substance,debug,write,cluster,manual])
         
     def show_path(self):
         path = self.ui.pathLine.text()#QtGui.QDesktopServices.storageLocati$

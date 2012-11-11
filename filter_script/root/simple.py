@@ -2,8 +2,8 @@
 
 # Form implementation generated from reading ui file 'simple.ui'
 #
-# Created: Thu Feb  2 16:34:23 2012
-#      by: PyQt4 UI code generator 4.8.4
+# Created: Sat Nov 10 23:05:43 2012
+#      by: PyQt4 UI code generator 4.9.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -18,7 +18,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
         MainWindow.resize(1024, 580)
-        MainWindow.setProperty(_fromUtf8("QmodelIndex"), _fromUtf8(""))
+        MainWindow.setProperty("QmodelIndex", _fromUtf8(""))
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setFocusPolicy(QtCore.Qt.TabFocus)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
@@ -46,9 +46,11 @@ class Ui_MainWindow(object):
         self.substance_line.setObjectName(_fromUtf8("substance_line"))
         self.gridLayout_2.addWidget(self.substance_line, 1, 2, 1, 1)
         self.label_3 = QtGui.QLabel(self.layoutWidget)
+        self.label_3.setAlignment(QtCore.Qt.AlignCenter)
         self.label_3.setObjectName(_fromUtf8("label_3"))
         self.gridLayout_2.addWidget(self.label_3, 1, 1, 1, 1)
         self.label_2 = QtGui.QLabel(self.layoutWidget)
+        self.label_2.setAlignment(QtCore.Qt.AlignCenter)
         self.label_2.setObjectName(_fromUtf8("label_2"))
         self.gridLayout_2.addWidget(self.label_2, 0, 1, 1, 1)
         self.database_checkBox = QtGui.QCheckBox(self.fEPSPanalyser)
@@ -57,7 +59,12 @@ class Ui_MainWindow(object):
         self.database_checkBox.setObjectName(_fromUtf8("database_checkBox"))
         self.clusterizationBox = QtGui.QCheckBox(self.fEPSPanalyser)
         self.clusterizationBox.setGeometry(QtCore.QRect(20, 200, 241, 20))
+        self.clusterizationBox.setChecked(True)
         self.clusterizationBox.setObjectName(_fromUtf8("clusterizationBox"))
+        self.manualFibreSearchBox = QtGui.QCheckBox(self.fEPSPanalyser)
+        self.manualFibreSearchBox.setGeometry(QtCore.QRect(20, 230, 241, 20))
+        self.manualFibreSearchBox.setChecked(False)
+        self.manualFibreSearchBox.setObjectName(_fromUtf8("manualFibreSearchBox"))
         self.tabWidget.addTab(self.fEPSPanalyser, _fromUtf8(""))
         self.tab = QtGui.QWidget()
         self.tab.setObjectName(_fromUtf8("tab"))
@@ -199,12 +206,13 @@ class Ui_MainWindow(object):
         self.sourceList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.sourceList.setObjectName(_fromUtf8("sourceList"))
         self.pathLine = QtGui.QLineEdit(self.centralwidget)
-        self.pathLine.setGeometry(QtCore.QRect(20, 30, 941, 25))
+        self.pathLine.setGeometry(QtCore.QRect(60, 30, 901, 25))
         self.pathLine.setMaxLength(32765)
         self.pathLine.setDragEnabled(True)
         self.pathLine.setObjectName(_fromUtf8("pathLine"))
         self.pathLabel = QtGui.QLabel(self.centralwidget)
-        self.pathLabel.setGeometry(QtCore.QRect(20, 10, 138, 16))
+        self.pathLabel.setGeometry(QtCore.QRect(20, 30, 41, 31))
+        self.pathLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.pathLabel.setObjectName(_fromUtf8("pathLabel"))
         self.exitButton = QtGui.QPushButton(self.centralwidget)
         self.exitButton.setGeometry(QtCore.QRect(860, 550, 146, 25))
@@ -234,12 +242,13 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QtGui.QApplication.translate("MainWindow", "MainWindow", None, QtGui.QApplication.UnicodeUTF8))
         self.fEPSP_button.setText(QtGui.QApplication.translate("MainWindow", "Start fEPSP-analiser", None, QtGui.QApplication.UnicodeUTF8))
-        self.debugBox.setText(QtGui.QApplication.translate("MainWindow", "debug", None, QtGui.QApplication.UnicodeUTF8))
+        self.debugBox.setText(QtGui.QApplication.translate("MainWindow", "Debug", None, QtGui.QApplication.UnicodeUTF8))
         self.frequency_line.setText(QtGui.QApplication.translate("MainWindow", "200000", None, QtGui.QApplication.UnicodeUTF8))
-        self.label_3.setText(QtGui.QApplication.translate("MainWindow", "substance", None, QtGui.QApplication.UnicodeUTF8))
-        self.label_2.setText(QtGui.QApplication.translate("MainWindow", "frequency", None, QtGui.QApplication.UnicodeUTF8))
-        self.database_checkBox.setText(QtGui.QApplication.translate("MainWindow", "write to database", None, QtGui.QApplication.UnicodeUTF8))
-        self.clusterizationBox.setText(QtGui.QApplication.translate("MainWindow", "replace clusterization by stimDetect", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_3.setText(QtGui.QApplication.translate("MainWindow", "Tags", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_2.setText(QtGui.QApplication.translate("MainWindow", "Frequency", None, QtGui.QApplication.UnicodeUTF8))
+        self.database_checkBox.setText(QtGui.QApplication.translate("MainWindow", "Write to database", None, QtGui.QApplication.UnicodeUTF8))
+        self.clusterizationBox.setText(QtGui.QApplication.translate("MainWindow", "Replace clusterization by stimDetect", None, QtGui.QApplication.UnicodeUTF8))
+        self.manualFibreSearchBox.setText(QtGui.QApplication.translate("MainWindow", "Manual fibre search", None, QtGui.QApplication.UnicodeUTF8))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.fEPSPanalyser), QtGui.QApplication.translate("MainWindow", "fEPSP-analyser", None, QtGui.QApplication.UnicodeUTF8))
         self.createListButton.setText(QtGui.QApplication.translate("MainWindow", "создать список", None, QtGui.QApplication.UnicodeUTF8))
         self.graphButton.setText(QtGui.QApplication.translate("MainWindow", "graph", None, QtGui.QApplication.UnicodeUTF8))
@@ -264,8 +273,8 @@ class Ui_MainWindow(object):
         self.label_10.setText(QtGui.QApplication.translate("MainWindow", "DataBase configuration", None, QtGui.QApplication.UnicodeUTF8))
         self.label_11.setText(QtGui.QApplication.translate("MainWindow", "Server address", None, QtGui.QApplication.UnicodeUTF8))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), QtGui.QApplication.translate("MainWindow", "config", None, QtGui.QApplication.UnicodeUTF8))
-        self.pathLine.setText(QtGui.QApplication.translate("MainWindow", "data/", None, QtGui.QApplication.UnicodeUTF8))
-        self.pathLabel.setText(QtGui.QApplication.translate("MainWindow", "Путь до директории:", None, QtGui.QApplication.UnicodeUTF8))
-        self.exitButton.setText(QtGui.QApplication.translate("MainWindow", "выход", None, QtGui.QApplication.UnicodeUTF8))
+        self.pathLine.setText(QtGui.QApplication.translate("MainWindow", "/media/", None, QtGui.QApplication.UnicodeUTF8))
+        self.pathLabel.setText(QtGui.QApplication.translate("MainWindow", "Path:", None, QtGui.QApplication.UnicodeUTF8))
+        self.exitButton.setText(QtGui.QApplication.translate("MainWindow", "Exit", None, QtGui.QApplication.UnicodeUTF8))
         self.upButton.setText(QtGui.QApplication.translate("MainWindow", "../", None, QtGui.QApplication.UnicodeUTF8))
 
