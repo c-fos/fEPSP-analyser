@@ -16,7 +16,7 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.rTagDict={"коф":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
+        self.rTagDict={"коф":"инкубация","КОФ":"инкубация","ФИЗ":"инкубация","физ":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
         self.rTagMask=["до","перед","макс","отмыв"]
         
     def tagWriter(self):

@@ -11,7 +11,7 @@ def shedule(path,initTags,frequ='200000'):
     for i in dict1.keys():
         print(i)
         try:
-            analyserObject=fepspAnalyser([0,i,frequ,"data","1",dict1[i],0,1,0])
+            analyserObject=fepspAnalyser([0,i,frequ,"data","1",dict1[i],0,1,0,0])
             del analyserObject
             #print((0,i,frequ,"data","1",dict1[i],0,1,0))
         except:

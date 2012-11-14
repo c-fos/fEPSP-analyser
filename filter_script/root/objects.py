@@ -26,6 +26,7 @@ class Spike:
         self.spikeBack=0
         self.area=0
         self.fibre=0
+        self.spikeDelay=0
     
   #  def calculate(self):
         #self.spikeLength=1000.0*(self.spikeMax2-self.spikeMax1)/self.frequency#msec

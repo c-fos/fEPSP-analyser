@@ -510,19 +510,18 @@ class dataSample:
         if self.debug==1:
             print((self.fileName,self.spikeDict))
         
-    def checkForFibrePotential(self,spikeList):
-        tmpObject = getattr(self,spikeList[0])#this computation writing as distinct function because i will add more filters later
-        fibre=1
-        if tmpObject.spikeNumber!=0:
-            print("error in fibre potential check") 
-        if rInterface.neuroCheck(tmpObject.spikeMax2Val-tmpObject.spikeMinVal,tmpObject.spikeLength,tmpObject.spikeFront,tmpObject.spikeBack,self.frequency/1000)>=0.5:
-            fibre=0
-            print("There are AP at zero position")
-            for i in spikeList:
-                tmpObject = getattr(self,i)
-                tmpObject.spikeNumber=tmpObject.spikeNumber+1
-        return (fibre-1), spikeList
-    
+    def checkForFibrePotential(self,spikeList,respDictValue):
+        try:
+            print(self.responseDict.values())
+            tmpObject=getattr(self,respDictValue)
+            tmpObject2=getattr(self,tmpObject.spikes[0])
+            if rInterface.neuroCheck(tmpObject2.spikeMax2Val-tmpObject2.spikeMinVal,tmpObject2.spikeDelay,tmpObject2.spikeLength,tmpObject2.spikeFront,tmpObject2.spikeBack,self.frequency/1000)>=0.5:
+                tmpObject2.fibre=1
+                print("There are AP at zero position")
+        except:
+            print "Unexpected error wile fibre potential checking:", sys.exc_info()
+            
+                     
     def interactiveFibreSearch(self,spikeList,respDictValue):
         try:
             print(self.responseDict.values())
@@ -895,29 +894,30 @@ class dataSample:
             tmpObject=getattr(self,self.responseDict[index])
             try:
                 #tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
-                tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
+                try:
+                    tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
+                    tmpObject.responseStart=rMatrix[i-1][0]
+                    tmpObject.responseEnd=rMatrix[i-1][1]
+                    tmpObject.length=self.getResponsLength(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                    tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                    tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                    tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
+                    tmpObject.responsNumber=i
+                    tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
+                except:
+                    print "Unexpected error wile fill response properties:", sys.exc_info()
+                try:
+                    self.setSpikeDelays(tmpObject.spikes,tmpObject.responseStart)
+                except:
+                    print "Unexpected error wile setSpikeDelays:", sys.exc_info() 
                 if self.manual==1:
                     self.interactiveFibreSearch(array(self.spikeDict.values())[self.clusters==i],self.responseDict[index])
                 else:
-                    pass
+                    self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i],self.responseDict[index])
+                self.spikeNumberShift(tmpObject)    
                     #tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
             except:
-                print "Unexpected error wile checkForFibrePotential:", sys.exc_info()
-            try:
-                tmpObject.responseStart=rMatrix[i-1][0]
-                tmpObject.responseEnd=rMatrix[i-1][1]
-                tmpObject.length=self.getResponsLength(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-                tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-                tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
-                tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
-                tmpObject.responsNumber=i
-                tmpObject.vpsp=round(tmpObject.response_top-tmpObject.baselevel,1)
-            except:
-                print "Unexpected error wile fill response properties:", sys.exc_info()
-            try:
-                self.setSpikeDelays(tmpObject.spikes,tmpObject.responseStart)
-            except:
-                print "Unexpected error wile setSpikeDelays:", sys.exc_info()        
+                print "Unexpected error wile checkForFibrePotential:", sys.exc_info()       
             try:
                 epspStartCorrection,tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
                 epspAreaStart,tmpObject.epspArea=self.Area(tmpObject,epspAreaStart,epspStartCorrection)
@@ -927,6 +927,18 @@ class dataSample:
                 self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
         
+    def spikeNumberShift(self,tmpObject):
+        tmpObject2=getattr(self,tmpObject.spikes[0])
+        print (tmpObject2.spikeNumber,tmpObject2.fibre)
+        if tmpObject2.spikeNumber==0 and tmpObject2.fibre!=1:
+            print("spike number shift")
+            for i in tmpObject.spikes:
+                print(i)
+                tmpObject2=getattr(self,i)
+                print(tmpObject2.spikeNumber)
+                tmpObject2.spikeNumber+=1
+                print(tmpObject2.spikeNumber)
+             
     def Area(self,tmpObject,epspAreaStart,epspStartCorrection):
         start=tmpObject.responseStart
         stop=tmpObject.responseEnd
