@@ -36,8 +36,8 @@ from os import stat
 from time import strftime,localtime
 from glob import glob
 import sys,pickle
-from dbAccess import Mysql_writer
-from filtering_lib2 import dataSample
+from root.dbAccess import Mysql_writer
+from root.filtering_lib2 import dataSample
 import shutil
 
 class fepspAnalyser:

@@ -8,7 +8,7 @@ This function is just simple placeholder.
 import matplotlib.pyplot as plt
 import pywt
 import numpy
-from externalFunctions import iswt
+from root.externalFunctions import iswt
 
 def resultAnalysis(parentObj,debug):
     if len(parentObj.responseDict)>=1:# and len(parentObj.epsp[0])==len(parentObj.responseDict):

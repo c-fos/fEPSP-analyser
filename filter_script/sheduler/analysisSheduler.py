@@ -11,7 +11,7 @@ import sys
 from glob import glob
 from os.path import isdir
 from os import remove
-from fEPSPanalyser import fepspAnalyser
+from root.fEPSPanalyser import fepspAnalyser
 
 def addDir(path):
     if isdir(path):

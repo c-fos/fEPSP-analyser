@@ -20,11 +20,11 @@ Created on 29.11.2011
 
 @author: pilat
 '''
-
-from glob import glob
+import pickle,os,sys,pylab,numpy
+from glob import glob 
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-import pickle,os,sys,pylab,numpy
+
 
 class graphReconstruction:
     def __init__(self, fileList, start=0, stop=10000, rstride=2, cstride=20, debug="0"):

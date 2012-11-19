@@ -3,7 +3,7 @@ Created on 16.10.2012
 
 @author: pilat
 '''
-from fEPSPanalyser import fepspAnalyser
+from root.fEPSPanalyser import fepspAnalyser
 from sheduler.dirDictConstructor import dirDict
 from sys import exc_info
 def shedule(path,initTags,frequ='200000'):

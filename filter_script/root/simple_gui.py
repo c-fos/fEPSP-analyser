@@ -1,8 +1,8 @@
 import sys
 from PyQt4 import QtCore, QtGui
-from simple import Ui_MainWindow
-from graph import graphReconstruction
-from fEPSPanalyser import fepspAnalyser
+from root.simple import Ui_MainWindow
+from root.graph import graphReconstruction
+from root.fEPSPanalyser import fepspAnalyser
 import pickle
 
 try:

@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, ptp, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32,argmin
+from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32,argmin
 import pywt
 import os    
 import tempfile
@@ -18,13 +18,13 @@ matplotlib.use('agg')
 from matplotlib.patches import Rectangle
 from matplotlib.widgets import Cursor
 import matplotlib.pyplot as plt
-from externalFunctions import iswt,extrema,smooth
-from objects import Spike,Response
+from root.externalFunctions import iswt,extrema
+from root.objects import Spike,Response
 from scipy.interpolate import Rbf
 from scipy import polyval, polyfit, signal
-from clussterization import clusterization, clusterAnalyser
-from checkResult import resultAnalysis
-import rInterface
+from root.clussterization import clusterization, clusterAnalyser
+from root.checkResult import resultAnalysis
+import root.rInterface as rInterface 
 
 class dataSample:
     def __init__(self,filename,dbobject,arguments):        
