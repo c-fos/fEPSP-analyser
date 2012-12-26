@@ -8,6 +8,7 @@ Created on 05.12.2011
 from time import strftime,localtime
 from os import stat
 import sys,MySQLdb,pickle
+from numpy import median,diff
 
 class Mysql_writer:
     
@@ -16,8 +17,9 @@ class Mysql_writer:
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.rTagDict={"коф":"инкубация","КОФ":"инкубация","ФИЗ":"инкубация","физ":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
+        self.rTagDict={"reox":"реоксигенация","n2":"гипоксия","реокс":"реоксигенация","гипокс":"гипоксия","коф":"инкубация","КОФ":"инкубация","ФИЗ":"инкубация","физ":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
         self.rTagMask=["до","перед","макс","отмыв"]
+        self.koef=1
         
     def tagWriter(self):
         tagList= self.tagString.split(',')
@@ -126,15 +128,18 @@ class Mysql_writer:
         cursor.close()
     
     def dbWriteResponse(self,tmpObject):
-        rNumber=tmpObject.responsNumber
-        vpsp=tmpObject.vpsp
-        nOfSpikes=len(tmpObject.spikes)
-        rLength=tmpObject.length
-        epspArea=tmpObject.epspArea     
+        rNumber=str(tmpObject.responsNumber)
+        vpsp=str(tmpObject.vpsp*self.koef)
+        nOfSpikes=str(len(tmpObject.spikes))
+        rLength=str(tmpObject.length)
+        epspArea=str(tmpObject.epspArea)
+        epspFront=str(tmpObject.epspFront)
+        epspBack=str(tmpObject.epspBack)
+        epspEpileptStd=str(tmpObject.epspEpileptStd)
         cursor = self.conn.cursor()
         cursor.execute("INSERT INTO responses(number,numberofspikes,length,record_idrecord,vpsp,epspFront,epspBack,epileptStd,epspArea)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)", (str(rNumber),str(nOfSpikes),str(rLength),str(self.idRecord),str(vpsp),\
-                             str(tmpObject.epspFront),str(tmpObject.epspBack),str(tmpObject.epspEpileptStd),str(epspArea)))
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)", (rNumber,nOfSpikes,rLength,str(self.idRecord),vpsp,\
+                             epspFront,epspBack,epspEpileptStd,epspArea))
         self.conn.commit()
         cursor.close()
         
@@ -170,25 +175,58 @@ class Mysql_writer:
         cursor.close()   
 
     def dbWriteSpike(self,tmpObject):
-        ampl=str(tmpObject.spikeAmpl)
-        number=tmpObject.spikeNumber
+        ampl=str(tmpObject.spikeAmpl*self.koef)
+        number=str(tmpObject.spikeNumber)
         sLength=str(tmpObject.spikeLength)#must be changed to length at 80% or something like that
-        maxdiff=str(tmpObject.spikeMax2Val-tmpObject.spikeMax1Val)
+        maxdiff=str((tmpObject.spikeMax2Val-tmpObject.spikeMax1Val)*self.koef)
         angle1=str(tmpObject.spikeFront)
         angle2=str(tmpObject.spikeBack)
         delay=str(tmpObject.spikeDelay)
-        maxToMin=str(tmpObject.spikeMaxToMin)
+        maxToMin=str(tmpObject.spikeMaxToMin*self.koef)
         area=str(tmpObject.area)
         fibre=str(tmpObject.fibre)
+        manual=str(tmpObject.manual)
         cursor = self.conn.cursor()
         cursor.execute("SELECT idresponses\
                              FROM responses\
                              ORDER BY idresponses\
                              DESC LIMIT 1;")
         idResponse = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin,area,fibre)\
-                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,str(number),str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin,area,fibre))
+        cursor.execute("INSERT INTO spikes(ampl,number,responses_idresponses,length,maxDiff,angle1,angle2,delay,maxtomin,area,fibre,manual)\
+                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);", (ampl,number,str(idResponse),sLength,maxdiff,angle1,angle2,delay,maxToMin,area,fibre,manual))
         self.conn.commit()
         cursor.close()
     def dbDisconnect(self):
         self.conn.close()
+        
+    def dbWriteStim(self,base_sample,sample,length,number,status,freq,sampleStdDiff,samplePtpDiff):
+        try:
+            length=str(length*100000.0/freq)
+            try:
+                ptp=str(sample.ptp()*0.1)
+            except:
+                ptp=str(0)
+            try:
+                base_ptp=str(base_sample.ptp()*0.1)
+            except:
+                base_ptp=str(0)
+            std=str(sample.std())
+            median1=str(median(sample)*0.1)
+            mean=str(sample.mean()*0.1)
+            base_mean=str(base_sample.mean()*0.1)
+            base_median=str(median(base_sample)*0.1)
+            base_std=str(base_sample.std())
+            number=str(number)
+            #status=status
+            diff_median=str(median(diff(sample*1.0)))
+            base_diff_median=str(median(diff(base_sample*1.0)))
+        except:
+            print "Unexpected error wile dbWriteStim in prop preparation:", sys.exc_info()
+        cursor = self.conn.cursor()
+        #print(length,max,min,std,median1,mean,base_mean,base_median,base_std,number,real,diff_median,base_diff_median)
+        try:
+            cursor.execute("INSERT INTO stimProperties(length,ptp,base_ptp,std,median,mean,base_mean,base_median,base_std,number,status,diff_median,base_diff_median,sampleStdDiff,samplePtpDiff) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);" % (length,ptp,base_ptp,std,median1,mean,base_mean,base_median,base_std,number,status,diff_median,base_diff_median,sampleStdDiff,samplePtpDiff))
+        except:
+            print "Unexpected error wile dbWriteStim in dbAccess:", sys.exc_info()
+        self.conn.commit()
+        cursor.close()
