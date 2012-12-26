@@ -8,7 +8,7 @@ Created on 05.12.2011
 #library for filtering
 import sys
 from mimetypes import guess_type
-from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32,argmin
+from numpy import zeros, log, asmatrix, append, arange, math, empty, sqrt, histogram, ones, diff, loadtxt, fromfile, array, int16, unique, where,float16,float32,argmin,median
 import pywt
 import os    
 import tempfile
@@ -157,10 +157,12 @@ class dataSample:
 
     def dataLoading(self):
         if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
-            data = loadtxt(self.fileName,dtype='float32')
+            tmpData = loadtxt(self.fileName,dtype='float32')
+            data=self.amplLoad(self.fileName,tmpData)
             self.data = self.dataFitting(data,self.frequency)
         else:
             data=fromfile(self.fileName,int16)
+            data=self.amplLoad(self.fileName,tmpData)
             self.data=self.dataFitting(data,self.frequency)
     
     def freqLoad(self,filename,defFrequ):
@@ -168,7 +170,7 @@ class dataSample:
             dictionary=dict()
             iniName=filename.strip('.dat')+".ins"
             print(filename)
-            print(iniName)
+            #print(iniName)
             fd=file(iniName,'r')
             for line in fd.readlines():
                 pairs = line.split("=")
@@ -179,7 +181,13 @@ class dataSample:
             print "freqLoad() error:", sys.exc_info()
             frequency=defFrequ
         return frequency
-            
+    
+    def amplLoad(self,filename,data):
+            if ("5мв" in filename) or ("5mv" in filename):
+                print("# 5mv amplifier #")
+                return(data*5.0/2)
+            else:
+                return data        
     def histMean(self,sample):
         unique1=unique(sample)
         if len(unique1)>1:
@@ -203,7 +211,7 @@ class dataSample:
     def tresholdCreating(self):
         msec=self.frequency/1000 # 1 msec =  frequency/1000 points        
         self.defaultFrame=4*msec #frame size for mean() and std() finding must depend on frequency. assume it equal to 4 msec
-        self.stimulyDuration=int(1*msec) #1msec# treshold for stimuli filtering ~20points==2msec==2*self.msec
+        self.stimulyDuration=int(0.8*msec) #1msec# treshold for stimuli filtering ~20points==2msec==2*self.msec
         self.level=int((math.log(100.0/self.frequency,0.5)-1)) #wavelet decomposition level. level 6 to 10kHz signal.
         self.baseFrequency=300 #we must separate the levels of wavelet decomposition that contains most part of the signal
         highNoiseFrequency=14000.0
@@ -278,41 +286,91 @@ class dataSample:
         pwr4Std=self.stdFinder(pwr2[self.deltaLen:], self.defaultFrame)
         pwr4ptp=pwr2.ptp()
         treshold=pwr4Std*1.5*log(pwr4ptp/pwr4Std)#11 - empirical finding coef         
+        #treshold=pwr4Std*1.5*log(pwr4ptp/pwr4Std)/1.1
         self.stimTreshold=treshold
         pwr5=zeros(len(pwr2))
         pwr5[1:]+=abs(diff(pwr2))
         pwr5[0]=pwr5[1]
         pwr5[pwr5<treshold]=0
         pwr5[pwr5>0]=treshold
+        #for i in pwr5:
+        #    try:
+        #        if(pwr5[i]==treshold and pwr5[i+2]==treshold):
+        #            pwr5[i+1]=treshold
+        #    except:
+        #        pass
         self.HiFrequNoise2=pwr5
         self.HiFrequNoise1=pwr2
         dpwr=where((diff(pwr5)==treshold)==True)[0]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)-1):
-            if dpwr[i+1]-dpwr[i]<self.stimulyDuration/4.0:
+            if dpwr[i+1]-dpwr[i]<self.stimulyDuration/3.0:
                 dpwrMask[i+1]=0
         dpwr=dpwr[dpwrMask]
         dpwrMask=ones(len(dpwr),dtype='bool')
         for i in range(len(dpwr)):
-            length1=len(where((abs(diff(pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/4]))>=treshold)==True)[0])
-            sample1=data[dpwr[i]+filterSize*2:dpwr[i]+filterSize*2+self.stimulyDuration/4]
-            sample2=data[dpwr[i]+filterSize*2-self.stimulyDuration/2:dpwr[i]+filterSize*2-self.stimulyDuration/4]
-            sample3=pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/4]
-            sample4=pwr2[dpwr[i]+filterSize-self.stimulyDuration/2:dpwr[i]+filterSize-self.stimulyDuration/4]
-            sampleSumDiff=abs(sample1).sum()/abs(sample2).sum()
+            length1=len(where((abs(diff(pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/2]))>=treshold)==True)[0])
+            sample1=data[dpwr[i]+filterSize*2:dpwr[i]+filterSize*2+self.stimulyDuration/2]
+            sample2=data[dpwr[i]+filterSize*2-self.stimulyDuration/2:dpwr[i]+filterSize*2]
+            sample3=pwr2[dpwr[i]+filterSize:dpwr[i]+filterSize+self.stimulyDuration/2]
+            sample4=pwr2[dpwr[i]+filterSize-self.stimulyDuration/2:dpwr[i]+filterSize]
+            sample5=data[dpwr[i]+filterSize*2-self.stimulyDuration/2:dpwr[i]+filterSize*2+self.stimulyDuration/2]
+            #sampleSumDiff=abs(sample1).sum()/abs(sample2).sum()
+            sampleSumDiff=abs(median(sample1)-median(sample2))
             sampleStdDiff=sample3.std()/sample4.std()
-            samplePtpDiff=abs(sample3).mean()/abs(sample4).mean()    
-            if sampleStdDiff>2.0 and samplePtpDiff>2.0:
-                print(("len of stimulum",i,dpwr[i]+filterSize,length1,length1/(self.stimulyDuration/(self.frequency/16000.0)),self.stimulyDuration/(self.frequency/16000.0),sampleSumDiff,sampleStdDiff,samplePtpDiff))
-                if length1>=self.stimulyDuration/12:
-                    pass
-                elif sampleSumDiff>2 and length1>=self.stimulyDuration/(self.frequency/16000.0)/8:
+            samplePtpDiff=abs(sample3).mean()/abs(sample4).mean()
+            sampleGlobalStd=median(sample5)/median(sample2)
+            if sampleSumDiff>0:
+                #neuroTestResult=rInterface.stimNeuroCheck(length1*100000.0/self.frequency,sample1.max()*0.1,sample1.min()*0.1,sample1.std(),median(sample1)*0.1,sample1.mean()*0.1,sample2.mean()*0.1,median(sample2)*0.1,sample2.std(),median(diff(sample1*1.0)),median(diff(sample2*1.0)),sampleStdDiff,samplePtpDiff)>=0.5
+                neuroTestResult=rInterface.stimNeuroCheck(length1*100000.0/self.frequency,sample1.ptp()*0.1,sample2.ptp()*0.1,sample1.std(),median(sample1)*0.1,sample1.mean()*0.1,sample2.mean()*0.1,median(sample2)*0.1,sample2.std(),median(diff(sample1*1.0)),median(diff(sample2*1.0)),sampleStdDiff,samplePtpDiff)>=0.5
+                #print(neuroTestResult)
+                if neuroTestResult:
+                    print("Accepted","start,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd",dpwr[i]+filterSize,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd)
+                    #self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"1",self.frequency,sampleStdDiff,samplePtpDiff)
                     pass
                 else:
                     dpwrMask[i]=0
-                    print("stimulum dropped")
+                    #self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"0",self.frequency,sampleStdDiff,samplePtpDiff)
+                    print("Dropped","start,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd",dpwr[i]+filterSize,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd)
             else:
                 dpwrMask[i]=0
+                #self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"0",self.frequency,sampleStdDiff,samplePtpDiff)
+                print("Dropped","start,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd",dpwr[i]+filterSize,samplePtpDiff,sampleStdDiff,sampleSumDiff,sampleGlobalStd)
+            #
+        
+            #===================================================================
+            # if (sampleStdDiff>1.1 and samplePtpDiff>1.2 and (sampleGlobalStd>1.005 or sampleGlobalStd<0.995)):
+            #    print(("len of stimulum",i,dpwr[i]+filterSize,length1,length1/(self.stimulyDuration/(self.frequency/16000.0)),self.stimulyDuration/(self.frequency/16000.0),sampleSumDiff,sampleStdDiff,samplePtpDiff))
+            #    if length1>=self.stimulyDuration/12 or (sampleSumDiff>10 and sampleStdDiff>1.2 and samplePtpDiff>1.5) or (sampleSumDiff>10 and samplePtpDiff>1.5 and sampleStdDiff>1.2) or (sampleSumDiff>50) or (sampleStdDiff>1.4 and samplePtpDiff>1.6)or (sampleStdDiff>1.6 and samplePtpDiff>1.4) or (sampleStdDiff>1.4 and samplePtpDiff>1.5 and sampleGlobalStd>0.98) or (sampleStdDiff>1.5 and samplePtpDiff>1.4 and sampleGlobalStd>0.98):
+            #        if self.write:
+            #            try:
+            #                self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"1",self.frequency,sampleStdDiff,samplePtpDiff) 
+            #            except:
+            #                print "Unexpected error wile dbWriteStim:", sys.exc_info()
+            #        else:
+            #            pass
+            #    #elif sampleSumDiff<0.5 and length1>=self.stimulyDuration/20:
+            #    #    pass
+            #    else:
+            #        if self.write:
+            #            try:
+            #                self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"0",self.frequency,sampleStdDiff,samplePtpDiff) 
+            #            except:
+            #                print "Unexpected error wile dbWriteStim:", sys.exc_info()
+            #        else:
+            #            pass
+            #        dpwrMask[i]=0
+            #        print("stimulum dropped")
+            # else:
+            #    if self.write:
+            #        try:
+            #            self.mysql_writer.dbWriteStim(sample2,sample1,length1,i,"0",self.frequency,sampleStdDiff,samplePtpDiff) 
+            #        except:
+            #            print "Unexpected error wile dbWriteStim:", sys.exc_info()
+            #    else:
+            #        pass
+            #    dpwrMask[i]=0
+            #===================================================================
         dpwr=dpwr[dpwrMask]
         if self.debug==1:
                 print("number of finded stimuls - %s" % len(dpwr))          
@@ -493,7 +551,6 @@ class dataSample:
                     tmpObject=getattr(self,self.spikeDict[index])                
                     tmpObject.responseStart=start
                     tmpObject.responseEnd=stop
-                    tmpObject.spikeNumber=0#i bkup
                     tmpObject.spikeMax1=spikePoints[i][0]
                     tmpObject.spikeMax1Val=self.result[spikePoints[i][0]]
                     tmpObject.spikeMin=spikePoints[i][1]
@@ -502,8 +559,8 @@ class dataSample:
                     tmpObject.spikeMax2Val=self.result[spikePoints[i][2]]
                     tmpObject.spikeMaxToMin=tmpObject.spikeMax2Val-tmpObject.spikeMinVal
                     tmpObject.spikeAmpl=ampl
-                    tmpObject.spikeDelay=0
-                    tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])
+                    tmpObject.manual=self.manual
+                    tmpObject.spikeLength=self.getSpikeLength(spikePoints[i][0],spikePoints[i][1],spikePoints[i][2])*1000.0/self.frequency
                     tmpObject.spikeFront,tmpObject.spikeBack=self.getSpikeAngles(resultData[spikePoints[i][0]:spikePoints[i][2]])
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
@@ -512,7 +569,7 @@ class dataSample:
         
     def checkForFibrePotential(self,spikeList,respDictValue):
         try:
-            print(self.responseDict.values())
+            #print(self.responseDict.values())
             tmpObject=getattr(self,respDictValue)
             tmpObject2=getattr(self,tmpObject.spikes[0])
             if rInterface.neuroCheck(tmpObject2.spikeMax2Val-tmpObject2.spikeMinVal,tmpObject2.spikeDelay,tmpObject2.spikeLength,tmpObject2.spikeFront,tmpObject2.spikeBack,self.frequency/1000)>=0.5:
@@ -615,7 +672,7 @@ class dataSample:
             angle2 = (sample[point4]-sample[point3])/(point4-point3)
         else:
             angle2 = sample[point4]-sample[point3]
-        return angle1,-angle2
+        return angle1*1000.0/self.frequency,-angle2*1000.0/self.frequency
             
     def getSpikeLength(self,max1,min1,max2):
         h1=self.result[max1]-self.result[min1]
@@ -770,7 +827,7 @@ class dataSample:
             mask[epspStart]=1
         else:
             intend=self.getFirstMaxIndent(tmpObject2.spikeMax1,self.result)
-            print(intend)
+            #print(intend)
             mask[tmpObject2.spikeMax1-tmpObject.responseStart]=1
             mask[tmpObject2.spikeMax2-tmpObject.responseStart]=1
             epspStart=tmpObject2.spikeMax1-intend-tmpObject.responseStart
@@ -898,7 +955,7 @@ class dataSample:
                     tmpObject.spikes=array(self.spikeDict.values())[self.clusters==i]
                     tmpObject.responseStart=rMatrix[i-1][0]
                     tmpObject.responseEnd=rMatrix[i-1][1]
-                    tmpObject.length=self.getResponsLength(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
+                    tmpObject.length=self.getResponsLength(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])*1000.0/self.frequency
                     tmpObject.response_top=max(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
                     tmpObject.response_bottom=min(self.result[rMatrix[i-1][0]:rMatrix[i-1][1]])
                     tmpObject.baselevel=self.result[rMatrix[i-1][0]-self.defaultFrame/2:rMatrix[i-1][0]].mean()
@@ -917,27 +974,28 @@ class dataSample:
                 self.spikeNumberShift(tmpObject)    
                     #tmpObject.fibre,tmpObject.spikes=self.checkForFibrePotential(array(self.spikeDict.values())[self.clusters==i])
             except:
-                print "Unexpected error wile checkForFibrePotential:", sys.exc_info()       
-            try:
-                epspStartCorrection,tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
-                epspAreaStart,tmpObject.epspArea=self.Area(tmpObject,epspAreaStart,epspStartCorrection)
-                tmpObject.epspEpileptStd=self.epileptStd
-            except:
-                print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
-                self.hardError=1
+                print "Unexpected error wile checkForFibrePotential:", sys.exc_info()
+            if len(unique(self.clusters))<4:     
+                try:
+                    epspStartCorrection,tmpObject.epspFront,tmpObject.epspBack = self.epspReconstructor(tmpObject)
+                    epspAreaStart,tmpObject.epspArea=self.Area(tmpObject,epspAreaStart,epspStartCorrection)
+                    tmpObject.epspEpileptStd=self.epileptStd
+                except:
+                    print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
+                    self.hardError=1
         print(self.fileName.split('/')[-1],self.responseDict)
         
     def spikeNumberShift(self,tmpObject):
         tmpObject2=getattr(self,tmpObject.spikes[0])
-        print (tmpObject2.spikeNumber,tmpObject2.fibre)
+        #print (tmpObject2.spikeNumber,tmpObject2.fibre)
         if tmpObject2.spikeNumber==0 and tmpObject2.fibre!=1:
             print("spike number shift")
             for i in tmpObject.spikes:
-                print(i)
+                #print(i)
                 tmpObject2=getattr(self,i)
-                print(tmpObject2.spikeNumber)
+                #print(tmpObject2.spikeNumber)
                 tmpObject2.spikeNumber+=1
-                print(tmpObject2.spikeNumber)
+                #print(tmpObject2.spikeNumber)
              
     def Area(self,tmpObject,epspAreaStart,epspStartCorrection):
         start=tmpObject.responseStart
@@ -952,11 +1010,11 @@ class dataSample:
             spikeStop=tmpObject2.spikeMax2-start-epspStartCorrection
             #ax.vlines(spikeStop,100, 0, color='r', linestyles='dashed')
             tmpObject2.area=round(sum(areaArray[spikeStart:spikeStop]))
-            print("spikeArea",j,tmpObject2.area)
-            print(areaArray[spikeStart],areaArray[spikeStop])
+            #print("spikeArea",j,tmpObject2.area)
+            #print(areaArray[spikeStart],areaArray[spikeStop])
         #plt.show()
         area=round(sum(areaArray))
-        print ("area",area,epspAreaStart,epspStartCorrection)
+        #print ("area",area,epspAreaStart,epspStartCorrection)
         epspAreaStart=epspAreaStart+stop-start
         return epspAreaStart,area
         
@@ -982,7 +1040,7 @@ class dataSample:
     def setSpikeDelays(self,spikeDict,startPoint):
         for i in spikeDict:
             tmpObject=getattr(self,i)
-            tmpObject.spikeDelay=tmpObject.spikeMin-startPoint
+            tmpObject.spikeDelay=(tmpObject.spikeMin-startPoint)*1000.0/self.frequency
                
     def plotData(self):
         #fig = plt.figure()
