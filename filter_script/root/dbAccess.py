@@ -58,7 +58,7 @@ class Mysql_writer:
         except:
             print("Load default database config")
             self.dbServerIp='localhost'
-            self.userName='filteruser_local'
+            self.userName='filter_user'
             self.userPassword='filter123'
             self.dbName='filterdb'
         self.date= strftime('%Y%m%d',localtime(stat(self.filePath).st_mtime))

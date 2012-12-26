@@ -3,7 +3,7 @@ S'localhost'
 p1
 aS'filterdb'
 p2
-aS'filteruser_local'
+aS'filter_user'
 p3
 aS'filter123'
 p4
