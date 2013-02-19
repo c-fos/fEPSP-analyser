@@ -156,14 +156,15 @@ class dataSample:
             self.manual = 1
 
     def dataLoading(self):
-        if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
-            tmpData = loadtxt(self.fileName,dtype='float32')
-            data=self.amplLoad(self.fileName,tmpData)
-            self.data = self.dataFitting(data,self.frequency)
-        else:
-            data=fromfile(self.fileName,int16)
-            data=self.amplLoad(self.fileName,tmpData)
-            self.data=self.dataFitting(data,self.frequency)
+        #print("mimetype = ",guess_type(self.fileName)[0])
+        #if guess_type(self.fileName)[0] == 'text/plain' or guess_type(self.fileName)[0] == 'chemical/x-mopac-input':
+        tmpData = loadtxt(self.fileName,dtype='float32')
+        data=self.amplLoad(self.fileName,tmpData)
+        self.data = self.dataFitting(data,self.frequency)
+        #else:
+        #    tmpData=fromfile(self.fileName,int16)
+        #    data=self.amplLoad(self.fileName,tmpData)
+        #    self.data=self.dataFitting(data,self.frequency)
     
     def freqLoad(self,filename,defFrequ):
         try:

@@ -55,9 +55,9 @@ class fepspAnalyser:
         
     def __init__(self,arguments):
         print(arguments)
-        dirPath = str(arguments[1])
+        dirPath = unicode(arguments[1])
         print(dirPath)
-        fileList=glob(dirPath+"/*.dat")
+        fileList=glob(dirPath+u'/*.dat')
         print(fileList)
         if int(arguments[7]):
             mysql_writer=Mysql_writer(fileList[0],arguments[5])
