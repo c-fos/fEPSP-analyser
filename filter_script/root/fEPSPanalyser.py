@@ -39,6 +39,8 @@ import sys,pickle
 from root.dbAccess import Mysql_writer
 from root.filtering_lib2 import dataSample
 import shutil
+import codecs
+
 
 class fepspAnalyser:
     
@@ -55,35 +57,49 @@ class fepspAnalyser:
         
     def __init__(self,arguments):
         print(arguments)
-        dirPath = unicode(arguments[1])
+        UTF8Writer = codecs.getwriter('utf8')
+        sys.stdout = UTF8Writer(sys.stdout)
+	#sys.setdefaultencoding('utf-8')
+
+        #print (sys.stdout.encoding)
+	dirPath = unicode(arguments[1])
         print(dirPath)
-        fileList=glob(dirPath+u'/*.dat')
+        fileList=glob(dirPath+'/*.dat')
         print(fileList)
         if int(arguments[7]):
             mysql_writer=Mysql_writer(fileList[0],arguments[5])
             print("write to database enabled")    
             mysql_writer.dbWriteExperiment()
+            print("experiment has been written")
             mysql_writer.tagWriter()
+            print("tag has been written")
         else:
             mysql_writer="pass"
         for i in fileList:
             fileName=i.split('/')[-1]
+            #print(unicode.encode(fileName,'utf-8'))
             try:
-                creatingTime=strftime('%H%M%S',localtime(stat(i).st_mtime))
+                creatingTime=strftime('%H%M%S',localtime(stat(unicode.encode(i,'utf-8')).st_mtime))
+                print(creatingTime)
                 if int(arguments[7]):
+                    print("mysql in main body start")
                     mysql_writer.filePath=i
                     mysql_writer.time = creatingTime
                     mysql_writer.dbWriteRecord()
+                    print("recodr has been written")
                     mysql_writer.dbWriteRecordTags(fileName)
+                    print("mysql in main body end")
                 dataSample1=dataSample(i,mysql_writer,arguments)
+                print("dataSample object created")
                 dataSample1.dataProcessing()
+                print("dataSample processing finished")
                 if dataSample1.hardError==1:
                     self.errorProcessing(i, "hard")
                 elif dataSample1.softError==1:
                     self.errorProcessing(i, "soft")
                 else:
                     try:
-                        name=dirPath+"/"+str(creatingTime)+"_"+fileName+".pic"
+                        name=dirPath+u"/"+unicode(creatingTime)+u"_"+fileName+u".pic"
                         with open(name,"w") as fd:
                             pickle.dump(dataSample1.result[dataSample1.stimuli[0][0]:],fd)
                     except: 
@@ -91,6 +107,7 @@ class fepspAnalyser:
                         raise
                 del dataSample1
             except:
+                print "Unexpected error in main body:", sys.exc_info()
                 try:
                     del dataSample1
                 except:

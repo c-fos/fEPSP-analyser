@@ -33,7 +33,7 @@ class dataSample:
         self.spikeDict=dict()
         self.responseList=[]
         self.responseDict=dict()
-        self.fileName = str(filename)
+        self.fileName = filename
         self.mysql_writer=dbobject
         self.arguments=arguments
         self.hardError=0
@@ -46,7 +46,7 @@ class dataSample:
             print "argReading() error:", sys.exc_info()
             self.hardError=1
         if self.debug==1:
-            print(self.fileName)
+            print(self.fileName.encode("utf-8"))
         try:
             self.frequency=self.freqLoad(self.fileName,self.defFrequency)
         except:
@@ -169,8 +169,8 @@ class dataSample:
     def freqLoad(self,filename,defFrequ):
         try:
             dictionary=dict()
-            iniName=filename.strip('.dat')+".ins"
-            print(filename)
+            iniName=filename.split('.dat')[0]+".ins"
+            #print(iniName.encode("utf-8"))
             #print(iniName)
             fd=file(iniName,'r')
             for line in fd.readlines():
@@ -184,7 +184,7 @@ class dataSample:
         return frequency
     
     def amplLoad(self,filename,data):
-            if ("5мв" in filename) or ("5mv" in filename):
+            if (u"5мв" in filename) or (u"5mv" in filename) or ("5мВ" in filename) or ("5mV" in filename):
                 print("# 5mv amplifier #")
                 return(data*5.0/2)
             else:
@@ -566,7 +566,7 @@ class dataSample:
             except:
                 print "Unexpected error in finding of stimuli end:", sys.exc_info()
         if self.debug==1:
-            print((self.fileName,self.spikeDict))
+            print((self.fileName.encode("utf-8"),self.spikeDict))
         
     def checkForFibrePotential(self,spikeList,respDictValue):
         try:
@@ -984,7 +984,7 @@ class dataSample:
                 except:
                     print "Unexpected error wile response %s reconstruction:" % i, sys.exc_info()
                     self.hardError=1
-        print(self.fileName.split('/')[-1],self.responseDict)
+        print(self.fileName.split('/')[-1].encode("utf-8"),self.responseDict)
         
     def spikeNumberShift(self,tmpObject):
         tmpObject2=getattr(self,tmpObject.spikes[0])
@@ -1110,7 +1110,7 @@ class dataSample:
             #
             plt.show()
         else:
-            plt.savefig(self.fileName+"_graph.png")
+            plt.savefig(self.fileName+u"_graph.png")
             #plt.show()
             plt.close()# very important to stop memory leak
         

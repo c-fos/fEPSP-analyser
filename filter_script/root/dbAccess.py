@@ -9,16 +9,22 @@ from time import strftime,localtime
 from os import stat
 import sys,MySQLdb,pickle
 from numpy import median,diff
+import codecs
+
+
 
 class Mysql_writer:
     
     def __init__(self,filePath,tagString):
+        UTF8Writer = codecs.getwriter('utf8')
+        sys.stdout = UTF8Writer(sys.stdout)
+
         self.filePath=filePath
         self.variables_global()
         self.dbConnect()
         self.tagString=tagString
-        self.rTagDict={"reox":"реоксигенация","отмывка":"отмывка","n2":"гипоксия","epi":"эпилепт","эпилепт":"эпилепт","воздействие":"воздействие","infl":"воздействие","реокс":"реоксигенация","гипокс":"гипоксия","коф":"инкубация","КОФ":"инкубация","ФИЗ":"инкубация","физ":"инкубация","тета":"тетанизация","инк":"инкубация","teta":"тетанизация"}
-        self.rTagMask=["до","перед","макс"]#self.rTagMask=["до","перед","макс","отмыв"]
+        self.rTagDict={u"reox":u"реоксигенация",u"отмывка":u"отмывка",u"n2":u"гипоксия",u"epi":u"эпилепт",u"эпилепт":u"эпилепт",u"воздействие":u"воздействие",u"inf":u"воздействие",u"реокс":u"реоксигенация",u"гипокс":u"гипоксия",u"коф":u"инкубация",u"КОФ":u"инкубация",u"ФИЗ":u"инкубация",u"физ":u"инкубация",u"тета":u"тетанизация",u"inkub":u"инкубация",u"инк":u"инкубация",u"teta":u"тетанизация"}
+        self.rTagMask=[u"до",u"перед",u"макс"]#self.rTagMask=["до","перед","макс","отмыв"]
         self.koef=1
         
     def tagWriter(self):
@@ -35,16 +41,19 @@ class Mysql_writer:
 
     def tagCheck(self,tag,table,idName):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
+        cursor.execute(u"SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
         try:
             tagId = cursor.fetchone()[0]
         except:
-            print "there are no '%s' tag" % tag, sys.exc_info()
-            cursor.execute("INSERT INTO {0}(tagName)\
+            print("start new tag creation")
+            tag_str=unicode.encode(tag,'utf-8')
+            #print "there are no '{0}' tag".format(tag_str)
+            cursor.execute(u"INSERT INTO {0}(tagName)\
                              VALUES ('{1}');".format(table,tag))
             self.conn.commit()
-            cursor.execute("SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
+            cursor.execute(u"SELECT {0} FROM {1} WHERE tagName='{2}';".format(idName,table,tag))
             tagId = cursor.fetchone()[0]
+            print("end new tag creation")
         return tagId
                 
     def variables_global(self):
@@ -63,7 +72,11 @@ class Mysql_writer:
             self.userName='filter_user'
             self.userPassword='filter123'
             self.dbName='filterdb'
-        self.date= strftime('%Y%m%d',localtime(stat(self.filePath).st_mtime))
+	#print(self.filePath)
+	utfPath=unicode.encode(self.filePath,'utf-8')
+	#print(utfPath)
+        self.date = strftime('%Y%m%d',localtime(stat(utfPath).st_mtime))
+	#print(self.date)
 
     def variables_local(self,tmpObject):#
         self.responsNumber=tmpObject.responsNumber
@@ -74,15 +87,17 @@ class Mysql_writer:
                 
     def dbConnect(self):
         try:
-            self.conn = MySQLdb.connect(self.dbServerIp,self.userName ,self.userPassword ,self.dbName );
+            self.conn = MySQLdb.connect(self.dbServerIp,self.userName ,self.userPassword ,self.dbName, use_unicode=True, charset="utf8" );
         except:
             print "Db connect error"
             sys.exit(1)
             
     def dbWriteExperiment(self):
-        experimentName=str(self.filePath.split('/')[-2])
+        #print u"{0}".format(self.filePath)
+        experimentName=self.filePath.split('/')[-2]
+        #print(experimentName.type())
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO experiment(date,experimentName)\
+        cursor.execute(u"INSERT INTO experiment(date,experimentName)\
                              VALUES (%s,%s);", (self.date,experimentName))
         self.conn.commit()
         cursor.execute("SELECT idexperiment \
@@ -93,11 +108,15 @@ class Mysql_writer:
         cursor.close()
         
     def dbWriteRecord(self):
-        fileName=str(self.filePath.split('/')[-1])
+        print("in writeRecord function")
+        fileName=self.filePath.split('/')[-1]
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO record(filename,time,\
+        try:
+            cursor.execute(u"INSERT INTO record(filename,time,\
                                             experiment_idexperiment)\
-                        VALUES(%s,%s,%s);", (fileName,self.time,str(self.idExperiment)))
+                        VALUES(%s,%s,%s);", (fileName,self.time,unicode(self.idExperiment)))
+        except:
+            print "Error in writeRecord function:", sys.exc_info()
         self.conn.commit()
         cursor.execute("SELECT idrecord \
                              FROM record \
@@ -107,6 +126,7 @@ class Mysql_writer:
         cursor.close()
          
     def findTags(self,tagString,tagDict,tagMask):
+        print("in findTag function")
         tagList=[]
         for i in tagDict.keys():
             if (i in tagString) and (all([j not in tagString for j in tagMask])==True):
@@ -114,15 +134,17 @@ class Mysql_writer:
         return tagList
         
     def dbWriteRecordTags(self,filename):
+        print("in writeRecordTag function")
         tagList = self.findTags(filename,(self.rTagDict),(self.rTagMask))
+        print("tag list has been created")
         if len(tagList)==0:
-            tagList = ["-"]
-        #print(tagList)
+            tagList = [u"-"]
+        print(tagList)
         cursor = self.conn.cursor()
         for i in tagList:
             tagId = self.tagCheck(i,"recordTags","idrecordTags")
             #print((self.idRecord,tagId))
-            cursor.execute("INSERT INTO recordToTags(record_idrecord,recordTags_idrecordTags)\
+            cursor.execute(u"INSERT INTO recordToTags(record_idrecord,recordTags_idrecordTags)\
                              VALUES (%s,%s);", (self.idRecord,tagId))
             self.conn.commit()
         cursor.close()
