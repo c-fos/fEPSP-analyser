@@ -183,7 +183,7 @@ class dataSample:
         return frequency
     
     def amplLoad(self,filename,data):
-            if ("5мв" in filename) or ("5mv" in filename):
+            if ("5мв" in filename) or ("5мВ" in filename) or ("5mv" in filename) or ("5mV" in filename):
                 print("# 5mv amplifier #")
                 return(data*5.0/2)
             else:
